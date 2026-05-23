@@ -1,14 +1,23 @@
 import { PERSONAS } from '../../routes.js'
 
-export default function TopBar({ currentPersona, onPersonaChange }) {
+export default function TopBar({ currentPersona, onPersonaChange, onMenuToggle }) {
   return (
-    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0">
-      <div className="flex items-center gap-2">
+    <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-4 md:px-6 flex-shrink-0">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onMenuToggle}
+          className="md:hidden p-1.5 rounded-md text-gray-500 hover:bg-gray-100"
+          aria-label="Toggle menu"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
         <span className="font-semibold text-indigo-700 text-base tracking-tight">Fintech Platform</span>
         <span className="text-gray-300 text-sm">MVP</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="text-xs text-gray-500">Viewing as</span>
+        <span className="hidden sm:inline text-xs text-gray-500">Viewing as</span>
         <select
           value={currentPersona.id}
           onChange={(e) => onPersonaChange(e.target.value)}

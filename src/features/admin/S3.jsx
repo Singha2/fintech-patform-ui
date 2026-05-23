@@ -140,7 +140,7 @@ export default function S3() {
 
           {step === 0 && (
             <Card title="Stage 1 — Create Entity (Verified via GST/MCA — C24)">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField label="Legal Name" id="lname" defaultValue={actingAs.legal_name} />
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium text-gray-700">Constitution Type</label>

@@ -99,7 +99,7 @@ export default function S4() {
             {/* Credit profile */}
             <Card title="Credit Profile">
               <div className="flex flex-col gap-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField label="Credit Limit (₹)" id="cl" placeholder="e.g. 1000000" defaultValue={selected.credit_limit_paise ? selected.credit_limit_paise / 100 : ''} type="number" />
                   <FormField label="Tenor Cap (days)"  id="tc" placeholder="90" type="number" defaultValue={selected.tenor_cap_days ?? ''} />
                 </div>
