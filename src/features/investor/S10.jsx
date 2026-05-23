@@ -43,22 +43,41 @@ function VariantSwitcher({ value, onChange }) {
 
 function ProgressBar({ activeStep }) {
   return (
-    <div className="flex items-start gap-1 mb-8">
-      {STAGES.map((label, i) => (
-        <div key={i} className="flex-1 flex flex-col items-center gap-1">
-          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
-            ${i < activeStep  ? 'bg-green-500 text-white' :
-              i === activeStep ? 'bg-indigo-600 text-white' :
-                                 'bg-gray-200 text-gray-400'}`}>
-            {i < activeStep ? '✓' : i + 1}
-          </div>
-          <span className={`text-[9px] text-center leading-tight
-            ${i === activeStep ? 'text-indigo-700 font-semibold' : 'text-gray-400'}`}>
-            {label}
-          </span>
+    <>
+      {/* Mobile: compact step indicator */}
+      <div className="flex items-center gap-3 mb-6 md:hidden">
+        <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-sm font-bold shrink-0">
+          {activeStep + 1}
         </div>
-      ))}
-    </div>
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-gray-900">{STAGES[activeStep]}</p>
+          <p className="text-xs text-gray-400">Step {activeStep + 1} of {STAGES.length}</p>
+        </div>
+        <div className="flex gap-0.5">
+          {STAGES.map((_, i) => (
+            <div key={i} className={`h-1.5 w-4 rounded-full ${i < activeStep ? 'bg-green-500' : i === activeStep ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+          ))}
+        </div>
+      </div>
+
+      {/* Desktop: full step circles */}
+      <div className="hidden md:flex items-start gap-1 mb-8">
+        {STAGES.map((label, i) => (
+          <div key={i} className="flex-1 flex flex-col items-center gap-1">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0
+              ${i < activeStep  ? 'bg-green-500 text-white' :
+                i === activeStep ? 'bg-indigo-600 text-white' :
+                                   'bg-gray-200 text-gray-400'}`}>
+              {i < activeStep ? '✓' : i + 1}
+            </div>
+            <span className={`text-[9px] text-center leading-tight
+              ${i === activeStep ? 'text-indigo-700 font-semibold' : 'text-gray-400'}`}>
+              {label}
+            </span>
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
