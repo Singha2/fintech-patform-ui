@@ -364,9 +364,11 @@ controllers** (`DocumentController`, `KycDocumentController`, `InvoiceDocumentCo
 - **Backend contract:** `doc_kind ∈ kyc_doc_kind` (`pan_card, address_proof, gst_certificate,
   certificate_of_incorporation, board_resolution, moa_aoa, bank_statement, cancelled_cheque, photograph,
   other`). Capture-only, advisory — **nothing is mandatory, coverage is advisory, gates nothing.** One active
-  doc per kind. `subject_type ∈ {investor, supplier}`. **You need a `kycFileId`** — determine how it is
-  obtained by reading the controller / a KYC flow; if the UI has no way to get it yet, treat the KYC-doc UI as
-  **backend-blocked** and note it (do not invent an id).
+  doc per kind. `subject_type ∈ {investor, supplier}`. **You need a `kycFileId`** — *resolved:* one
+  `comp_kyc_file` exists per subject (UNIQUE `subject_id`+`subject_type`) but **no endpoint exposes its id yet**.
+  The backend must add a resolver (`GET /suppliers/{id}/kyc-file` / `GET /investors/{id}/kyc-file` — backend
+  spec **BE-2**). Until BE-2 ships, the KYC-doc UI is **backend-blocked**: gate it behind BE-2, do not invent an
+  id. The `kyc_file_id` exists only after KYC is *submitted*.
 - **Test [needs backend]:** attach a `pan_card` doc to a known kyc file → `list` shows it `active` →
   `coverage` flips that kind to `true`.
 - **Acceptance:** attach + coverage reflect reality; requirements list loads.
@@ -489,8 +491,10 @@ Do the screens in this order (dependency + value). Each is one step with its own
 - **Acceptance:** S14 shows live supplier status; tracker mock-flagged; self-create clearly disabled in live.
 
 ### Step 5.12 — S15 buyer portal
-- Live: OTP login for the **ack user** (`ack@dev.local`) via the same `auth` flow (OTP-only; no password —
-  confirm the exact ack-user login path in the controller; if it differs from admin login, follow the backend).
+- Live: OTP login for the **ack user** (`ack@dev.local`). *Resolved:* the ack-user login is a **passwordless
+  email+OTP** path that **does not exist yet** — it is deferred backend work (**WS-2**, backend spec **BE-15**),
+  and it is **not** the admin `/auth/login/password` flow (ack users have no password credential). So S15 login
+  is **backend-blocked** until BE-15/WS-2 ships; keep S15 on the mock OTP flow in live mode until then.
 - Mock (gap G13): buyer-facing **invoice list**, **payment instruction**, **NOA**, and **self-ack** — there is
   no buyer-facing read or self-ack endpoint; buyer ack is recorded admin-side (`listings.recordBuyerAck`).
 - **Acceptance:** ack-user OTP login is live if supported; all buyer reads + self-ack stay mock-flagged with the
@@ -520,7 +524,8 @@ new id per user-initiated click, reuse on an automatic network retry.
 ### Step 6.4 — MFA-fresh / sensitive commands
 Some commands are MFA-fresh server-side. Keep the existing `MfaModal` as the UI gate on sensitive actions
 (go-live, disbursement approve, distribution approve). If the backend rejects for stale MFA, surface it and
-route the user to re-auth. Confirm which commands require MFA freshness by reading the `CommandGateway`.
+route the user to re-auth. *Resolved:* **every admin command requires MFA freshness** (all `SENSITIVE`, 5-min
+window) — so gate **all** admin commands with `MfaModal`, not just go-live/disbursement. Non-admin actors skip.
 - **Acceptance:** sensitive actions show the MFA gate and handle a stale-MFA rejection.
 
 ### Step 6.5 — Persona ⇄ role reconciliation
