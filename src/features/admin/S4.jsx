@@ -9,14 +9,15 @@ import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 
-const STATUS_COLOR = { nominated: 'gray', identity_verified: 'amber', under_credit_review: 'amber', approved_with_limit: 'amber', active: 'green', suspended: 'red' }
+// buyer_account_status lifecycle (backend): nominated → identity_verified → credit_assessed → engagement_started → active
+const STATUS_COLOR = { nominated: 'gray', identity_verified: 'amber', credit_assessed: 'amber', engagement_started: 'amber', active: 'green', suspended: 'red' }
 
 const STAGE_ACTIONS = {
-  nominated:            { label: 'Trigger Identity Verification', next: 'identity_verified' },
-  identity_verified:    { label: 'Start Credit Assessment',       next: 'under_credit_review' },
-  under_credit_review:  { label: 'Approve Credit',               next: 'approved_with_limit' },
-  approved_with_limit:  { label: 'Mark Active',                  next: 'active' },
-  active:               null,
+  nominated:          { label: 'Record Identity Verified', next: 'identity_verified' },   // POST /buyers/{id}/record-identity-verified
+  identity_verified:  { label: 'Record Credit Assessment', next: 'credit_assessed' },      // POST /buyers/{id}/record-credit-assessment
+  credit_assessed:    { label: 'Start Engagement',         next: 'engagement_started' },   // POST /buyers/{id}/start-engagement
+  engagement_started: { label: 'Activate Buyer',           next: 'active' },               // POST /buyers/{id}/activate
+  active:             null,
 }
 
 export default function S4() {

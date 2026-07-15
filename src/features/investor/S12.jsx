@@ -16,7 +16,7 @@ const VARIANTS = [
 ]
 
 const CHECK_LABELS = {
-  irn_verified:    'IRN Verified',
+  irn_validity:    'IRN Verified',
   buyer_ack:       'Buyer Acknowledgement',
   duplicate_check: 'Duplicate Check',
 }

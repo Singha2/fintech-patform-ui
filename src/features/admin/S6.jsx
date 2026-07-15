@@ -10,7 +10,8 @@ import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 
-const STATUS_COLOR = { pending_approval: 'amber', approved: 'amber', executed: 'green', failed: 'red' }
+// cash_payout_status: drafted|approved|sent|executed|partial|failed|completed
+const STATUS_COLOR = { drafted: 'amber', approved: 'amber', sent: 'amber', executed: 'green', partial: 'amber', failed: 'red', completed: 'green' }
 
 export default function S6() {
   const navigate = useNavigate()

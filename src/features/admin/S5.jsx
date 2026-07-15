@@ -11,11 +11,13 @@ import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate, formatDatetime } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 
+// Keys are the canonical ops-check `check_name` wire values (POST /listings/{id}/record-ops-check).
+// buyer_ack is a separate command (record-buyer-ack), grouped here for the UI only.
 const CHECK_LABELS = {
-  irn_verified: 'IRN Verified (INV.5)', eway_bill_match: 'E-Way Bill Match',
-  buyer_supplier_rel: 'Buyer-Supplier Relationship', duplicate_check: 'Duplicate Check',
-  exposure_cap: 'Exposure Cap', buyer_limit: 'Buyer Limit / Headroom',
-  doc_completeness: 'Document Completeness', buyer_ack: 'Buyer Acknowledgment (DL-019)',
+  irn_validity: 'IRN Verified (INV.5)', eway_bill_match: 'E-Way Bill Match',
+  buyer_supplier_relationship: 'Buyer-Supplier Relationship', duplicate_check: 'Duplicate Check',
+  supplier_exposure_cap: 'Exposure Cap', buyer_limit_headroom: 'Buyer Limit / Headroom',
+  document_completeness: 'Document Completeness', buyer_ack: 'Buyer Acknowledgment (DL-019)',
 }
 const OUTCOME_COLOR = { pass: 'green', fail: 'red', pending: 'amber' }
 

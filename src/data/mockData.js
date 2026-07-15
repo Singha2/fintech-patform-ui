@@ -1,9 +1,40 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// SOURCE OF TRUTH: the backend (fintech-platform-backend, served under /api/v1).
+// This file is a UI stand-in for that API. Field names, enum values, and command
+// envelopes below are aligned to the real endpoints — see docs/API_ALIGNMENT.md
+// for the full screen→endpoint→shape mapping and the read-side gap register.
+//
+// Two data kinds live here:
+//   • API-shaped   — objects whose fields/enums match a real endpoint (live-swap targets).
+//   • UI-composed  — data the backend does NOT yet expose; kept so screens render,
+//                    flagged `// GAP Gx` (x = the gap id in API_ALIGNMENT.md §4).
+//
+// Command responses from the backend are the envelope below (NOT the entity); after
+// a write the UI must re-read GET …/{id} and carry the new aggregate_version forward.
+// ─────────────────────────────────────────────────────────────────────────────
+const API_COMMAND_ENVELOPE_SHAPE = {
+  aggregate_id: 'uuid',
+  aggregate_version: 0,
+  emitted_events: [{ event_id: 'uuid', event_type: 'Some.Event', occurred_at: 'ISO-8601' }],
+  correlation_id: 'uuid',
+}
+
 const mockData = {
 
+  // Documents the shape every command endpoint returns (see API_ALIGNMENT.md §1.2).
+  _apiCommandEnvelope: API_COMMAND_ENVELOPE_SHAPE,
+
   // ── S1 — Login ────────────────────────────────────────────────
+  // API: two-step OTP flow — POST /auth/login/password {email,password} → {challenge_id};
+  //      POST /auth/login/verify-otp {challenge_id,code} → {bearer}. (mfa block below is UI-only)
   S1: {
     credentials: { email: 'ops@platform.com', password: '••••••••' },
-    mfa: { type: 'totp', code: '123456' },
+    mfa: { type: 'totp', code: '123456' }, // GAP: real flow is SMS-OTP, not TOTP
+    login_flow: {
+      password_endpoint: 'POST /api/v1/auth/login/password',
+      verify_endpoint: 'POST /api/v1/auth/login/verify-otp',
+      returns: { challenge_id: 'uuid', bearer: 'session-uuid' },
+    },
     personas: [
       { id: 'founder',     label: 'Founder / CEO',  roles: ['super_admin', 'compliance_reviewer'] },
       { id: 'ops_lead',    label: 'Ops Lead',        roles: ['ops_executive', 'treasury_and_settlement'] },
@@ -13,6 +44,7 @@ const mockData = {
   },
 
   // ── S2 — Admin Dashboard ──────────────────────────────────────
+  // GAP G1: no list/dashboard/metrics endpoint exists. All queues + stats are UI-composed.
   S2: {
     queues: {
       ops_executive: [
@@ -45,6 +77,10 @@ const mockData = {
   },
 
   // ── S3 — Supplier Onboarding ──────────────────────────────────
+  // API: commands POST /suppliers/create, /{id}/submit-kyc, /record-credit-review, /activate, …
+  //      read GET /suppliers/{id} → { supplier_id, status, aggregate_version } ONLY.
+  // GAP G2: supplier list + display fields (legal_name/pan/gstin/consent/timestamps) are UI-composed.
+  // status ∈ sup_account_status: created|identity_verified|kyc_submitted|kyc_approved|credit_reviewed|maa_signed|active
   S3: {
     suppliers: [
       {
@@ -84,6 +120,11 @@ const mockData = {
   },
 
   // ── S4 — Buyer Management ─────────────────────────────────────
+  // API: POST /buyers/nominate, /{id}/record-identity-verified, /record-credit-assessment {credit_limit_paise},
+  //      /start-engagement, /activate; credit via POST /credit/buyers/{id}/profile + /credit/pricing-bands.
+  //      read GET /buyers/{id} → { buyer_id, status, aggregate_version }.
+  // GAP G3: buyer list + display fields + pricing band list are UI-composed.
+  // status ∈ buyer_account_status: nominated|identity_verified|credit_assessed|engagement_started|active|suspended
   S4: {
     buyers: [
       {
@@ -110,7 +151,7 @@ const mockData = {
         sector: 'Manufacturing',
         relationship_tier: 'acknowledged_buyer',
         acknowledgment_mode: 'per_invoice',
-        status: 'under_credit_review',
+        status: 'identity_verified', // was 'under_credit_review' (not a real status); awaiting credit assessment
         credit_limit_paise: null,
         pricing_band_id: null,
         rating: 'AA',
@@ -119,13 +160,23 @@ const mockData = {
         last_review_at: null,
       },
     ],
+    // tenor_bucket ∈ risk_tenor_bucket: lte_30d|31_60d|61_90d|91_180d. API pricing bands carry a rate RANGE
+    // (rate_range_min_bps/rate_range_max_bps) + fee_bps, not a single rate_bps — kept single here for display.
     pricing_bands: [
-      { band_id: 'band-001', buyer_id: 'buy-001', tenor_bucket: '61-90d', rate_bps: 1200, fee_bps: 50 },
-      { band_id: 'band-002', buyer_id: 'buy-001', tenor_bucket: '31-60d', rate_bps: 1050, fee_bps: 50 },
+      { band_id: 'band-001', buyer_id: 'buy-001', tenor_bucket: '61_90d', rate_bps: 1200, fee_bps: 50 },
+      { band_id: 'band-002', buyer_id: 'buy-001', tenor_bucket: '31_60d', rate_bps: 1050, fee_bps: 50 },
     ],
   },
 
   // ── S5 — Invoice Checks + Listing Approval ───────────────────
+  // API: listing lifecycle — POST /listings, /{id}/start-ops-checks, /record-ops-check {check_name,outcome?},
+  //      /complete-ops-checks, /snapshot-and-ready {rate_bps}, /approve-go-live (treasury, checker≠maker).
+  //      read GET /listings/{id} → { listing_id, status, funding_target, va_id, aggregate_version }.
+  // check_outcomes keys below use the canonical check_name wire values (irn_validity, buyer_supplier_relationship,
+  // supplier_exposure_cap, buyer_limit_headroom, document_completeness). buyer_ack is a SEPARATE command
+  // (POST /{id}/record-buyer-ack), grouped here for the UI only.
+  // GAP G4: invoice list, supplier/buyer names, and per-check outcome detail are UI-composed (no read model).
+  // invoice status ∈ deal_invoice_status: submitted|ops_checks_in_progress|ops_checks_passed|ops_checks_failed|listed
   S5: {
     invoices: [
       {
@@ -140,14 +191,14 @@ const mockData = {
         irn: 'IRN123456789012345678901234567890123456789012345678',
         status: 'ops_checks_in_progress',
         check_outcomes: {
-          irn_verified:      { outcome: 'pass',    detail: 'Active on GST portal',          checked_at: '2026-05-02T09:00:00Z' },
-          eway_bill_match:   { outcome: 'pass',    detail: 'E-way bill matches invoice',    checked_at: '2026-05-02T09:02:00Z' },
-          buyer_supplier_rel:{ outcome: 'pass',    detail: 'Relationship validated',        checked_at: '2026-05-02T09:04:00Z' },
-          duplicate_check:   { outcome: 'pass',    detail: 'No duplicate found',            checked_at: '2026-05-02T09:05:00Z' },
-          exposure_cap:      { outcome: 'pass',    detail: 'Within supplier cap',           checked_at: '2026-05-02T09:06:00Z' },
-          buyer_limit:       { outcome: 'pass',    detail: 'Headroom ₹9,48,750 remaining', checked_at: '2026-05-02T09:07:00Z' },
-          doc_completeness:  { outcome: 'pending', detail: 'Document upload awaited',      checked_at: null },
-          buyer_ack:         { outcome: 'pending', detail: 'Acknowledgment request sent',  checked_at: null },
+          irn_validity:                { outcome: 'pass',    detail: 'Active on GST portal',          checked_at: '2026-05-02T09:00:00Z' },
+          eway_bill_match:             { outcome: 'pass',    detail: 'E-way bill matches invoice',    checked_at: '2026-05-02T09:02:00Z' },
+          buyer_supplier_relationship: { outcome: 'pass',    detail: 'Relationship validated',        checked_at: '2026-05-02T09:04:00Z' },
+          duplicate_check:             { outcome: 'pass',    detail: 'No duplicate found',            checked_at: '2026-05-02T09:05:00Z' },
+          supplier_exposure_cap:       { outcome: 'pass',    detail: 'Within supplier cap',           checked_at: '2026-05-02T09:06:00Z' },
+          buyer_limit_headroom:        { outcome: 'pass',    detail: 'Headroom ₹9,48,750 remaining', checked_at: '2026-05-02T09:07:00Z' },
+          document_completeness:       { outcome: 'pending', detail: 'Document upload awaited',      checked_at: null },
+          buyer_ack:                   { outcome: 'pending', detail: 'Acknowledgment request sent',  checked_at: null },
         },
       },
       {
@@ -162,14 +213,14 @@ const mockData = {
         irn: 'IRN987654321098765432109876543210987654321098765432',
         status: 'ops_checks_passed',
         check_outcomes: {
-          irn_verified:      { outcome: 'pass', detail: 'Active',             checked_at: '2026-04-26T09:00:00Z' },
-          eway_bill_match:   { outcome: 'pass', detail: 'Match',              checked_at: '2026-04-26T09:01:00Z' },
-          buyer_supplier_rel:{ outcome: 'pass', detail: 'OK',                 checked_at: '2026-04-26T09:02:00Z' },
-          duplicate_check:   { outcome: 'pass', detail: 'Clean',              checked_at: '2026-04-26T09:03:00Z' },
-          exposure_cap:      { outcome: 'pass', detail: 'Within',             checked_at: '2026-04-26T09:04:00Z' },
-          buyer_limit:       { outcome: 'pass', detail: 'OK',                 checked_at: '2026-04-26T09:05:00Z' },
-          doc_completeness:  { outcome: 'pass', detail: 'All docs present',   checked_at: '2026-04-26T09:06:00Z' },
-          buyer_ack:         { outcome: 'pass', detail: 'Acknowledged by portal', checked_at: '2026-04-26T09:10:00Z' },
+          irn_validity:                { outcome: 'pass', detail: 'Active',             checked_at: '2026-04-26T09:00:00Z' },
+          eway_bill_match:             { outcome: 'pass', detail: 'Match',              checked_at: '2026-04-26T09:01:00Z' },
+          buyer_supplier_relationship: { outcome: 'pass', detail: 'OK',                 checked_at: '2026-04-26T09:02:00Z' },
+          duplicate_check:             { outcome: 'pass', detail: 'Clean',              checked_at: '2026-04-26T09:03:00Z' },
+          supplier_exposure_cap:       { outcome: 'pass', detail: 'Within',             checked_at: '2026-04-26T09:04:00Z' },
+          buyer_limit_headroom:        { outcome: 'pass', detail: 'OK',                 checked_at: '2026-04-26T09:05:00Z' },
+          document_completeness:       { outcome: 'pass', detail: 'All docs present',   checked_at: '2026-04-26T09:06:00Z' },
+          buyer_ack:                   { outcome: 'pass', detail: 'Acknowledged by portal', checked_at: '2026-04-26T09:10:00Z' },
         },
       },
     ],
@@ -190,6 +241,10 @@ const mockData = {
   },
 
   // ── S6 — Disbursement Queue ───────────────────────────────────
+  // API: POST /listings/{id}/disbursement/draft (maker) → /disbursement/approve (checker≠maker) → disbursed.
+  //      read GET /listings/{id}/disbursement → { payout_instruction_id, status, gross_amount, listing_status }.
+  // status ∈ cash_payout_status: drafted|approved|sent|executed|partial|failed|completed
+  // GAP G5: no disbursement queue list; net_amount / maker-checker names / UTR are UI-composed.
   S6: {
     disbursements: [
       {
@@ -197,8 +252,8 @@ const mockData = {
         listing_id: 'lst-002',
         supplier_name: 'Beta Metals Pvt Ltd',
         buyer_name: 'Tata Steel Ltd',
-        net_amount_paise: 9996000,
-        status: 'pending_approval',
+        net_amount_paise: 9996000, // GAP G5: UI-composed (read returns gross_amount only)
+        status: 'drafted', // was 'pending_approval'
         all_signed: true,
         funding_completed_at: '2026-05-20T15:00:00Z',
         due_disbursement_date: '2026-05-21',
@@ -229,6 +284,10 @@ const mockData = {
   },
 
   // ── S7 — Distribution + Reconciliation ───────────────────────
+  // API: POST /listings/{id}/record-maturity {amount_paise,utr} → /distribution/draft → /distribution/approve
+  //      (closes deal → distributed). read GET /listings/{id}/distribution →
+  //      { payout_instruction_id, status, gross_amount, net_amount, total_tds_amount, listing_status, terminal_outcome }.
+  // status ∈ cash_payout_status (drafted|approved|…). GAP G6: per-investor breakdown + reconciliation have no endpoint.
   S7: {
     distributions: [
       {
@@ -238,7 +297,7 @@ const mockData = {
         maturity_date: '2026-05-15',
         buyer_payment_ref: 'NEFT20260515ABC',
         buyer_payment_amount_paise: 10400000,
-        status: 'distribution_pending',
+        status: 'drafted', // was 'distribution_pending'
         investors: [
           { investor_name: 'Rahul Mehta', amount_paise: 2000000, gross_paise: 2058333, tds_paise: 8333, fee_paise: 1000, net_paise: 2049000, utr: null },
           { investor_name: 'Priya Shah',  amount_paise: 3000000, gross_paise: 3087500, tds_paise: 12500, fee_paise: 1500, net_paise: 3073500, utr: null },
@@ -246,6 +305,7 @@ const mockData = {
         ],
       },
     ],
+    // GAP G6: reconciliation is entirely UI-composed — the backend exposes no reconciliation endpoint.
     reconciliation: [
       {
         rec_id: 'rec-001',
@@ -271,6 +331,8 @@ const mockData = {
   },
 
   // ── S8 — Investor Invite Issuance ─────────────────────────────
+  // API: POST /investor-invites/issue {email,phone} → command envelope. status ∈ inv_invite_status: pending|consumed|expired.
+  // GAP G7: no invite LIST endpoint; issued_by/justification are UI-only (issue takes only {email,phone}).
   S8: {
     invites: [
       { invite_id: 'inv-i-001', email_display: 'r.mehta@example.com', phone_display: '+91 98765 43210', issued_by: 'Founder / CEO', issued_at: '2026-05-01T10:00:00Z', expiry_at: '2026-05-15T10:00:00Z', status: 'consumed', consumed_at: '2026-05-03T09:00:00Z', justification: 'Personal network — known HNI' },
@@ -280,6 +342,8 @@ const mockData = {
   },
 
   // ── S9 — Audit Log ────────────────────────────────────────────
+  // GAP G8: no audit-query endpoint exists. Entire screen is UI-composed. (Commands ARE audit-logged
+  // server-side, but there is no read API to list them yet.)
   S9: {
     events: [
       { event_id: 'evt-001', event_type: 'Listing.GoneLive',          actor: 'Ops Lead (Treasury role)', target: 'LST-002',   recorded_at: '2026-05-10T09:00:00Z', sensitivity: 'standard' },
@@ -300,12 +364,21 @@ const mockData = {
   },
 
   // ── S10–S15 (investor / supplier / buyer — from Step 2) ───────
+  // S10 — Investor onboarding. API: POST /investors/sign-up {invite_id,email,phone,sub_type},
+  // /{id}/record-identity-verified {pan,aadhaar_last4}, /submit-kyc, /assess-suitability {mismatch?},
+  // /complete-financial-profile {bank_account_last4}, /record-kyc-approved, /record-mia-signed, /activate.
+  // read GET /investors/{id} → { investor_id, status, aggregate_version }.
+  // sub_type ∈ inv_sub_type: resident_individual|huf|nri|institutional (only first two active Phase 1).
+  // status ∈ inv_account_status: signed_up|identity_verified|kyc_submitted|suitability_assessed|
+  //          financial_profile_completed|kyc_approved|mia_signed|active. fatca ∈ us_person|non_us_person|pending.
   S10: {
     invite: { invite_id: 'inv-001', expiry_at: '2026-06-01T00:00:00Z', status: 'pending' },
-    investor: { investor_id: 'inv-acct-001', sub_type: 'resident_individual', status: 'kyc_submitted', pan: 'ABCDE1234F', aadhaar_last4: '7890', bank_account_last4: '4321', fatca_status: 'not_us_person', kyc_approved_by: null, kyc_approved_at: null, mia_signed_at: null, activated_at: null },
+    investor: { investor_id: 'inv-acct-001', sub_type: 'resident_individual', status: 'kyc_submitted', pan: 'ABCDE1234F', aadhaar_last4: '7890', bank_account_last4: '4321', fatca_status: 'non_us_person', kyc_approved_by: null, kyc_approved_at: null, mia_signed_at: null, activated_at: null },
     suitability: { assessment_id: 'suit-001', mismatch: false, override_text_hash: null },
   },
 
+  // S11 — Marketplace. GAP G9: no list-of-live-listings endpoint (only GET /listings/{id}).
+  // Subscribe IS backed: POST /listings/{id}/subscriptions/commit {investor_id, amount_paise}.
   S11: {
     listings: [
       { listing_id: 'lst-001', buyer_name: 'Reliance Industries Ltd', buyer_sector: 'Energy',        supplier_name: 'Alpha Components Pvt Ltd', funding_target: 5000000,  committed_total: 3000000,  funding_window_close_at: '2026-05-28T18:00:00Z', rate_bps: 1200, tenor_days: 90, due_date: '2026-08-20', status: 'live',         investor_subscribed: false },
@@ -314,14 +387,25 @@ const mockData = {
     ],
   },
 
+  // S12 — Listing detail + subscribe. read GET /listings/{id} returns ONLY
+  // { listing_id, status, funding_target, va_id, aggregate_version }.
+  // GAP G10: pricing_snapshot, committed_total, VA number/IFSC, invoice detail, buyer/supplier = UI-composed.
+  // Invoice PDF IS backed: GET /listings/{id}/invoice-documents + …/{documentId}/content.
   S12: {
     listing: { listing_id: 'lst-001', status: 'live', funding_target: 5000000, committed_total: 3000000, funding_window_close_at: '2026-05-28T18:00:00Z', pricing_snapshot: { rate_bps: 1200, fee_bps: 50, snapshot_at: '2026-05-01T10:00:00Z' }, va_id: 'va-001', virtual_account_number: '9234567890123456', virtual_account_ifsc: 'RATN0VAAPIS' },
-    invoice: { invoice_number: 'INV-2026-0042', face_value: 5125000, tenor_days: 90, due_date: '2026-08-20', invoice_date: '2026-05-01', irn: 'IRN123456789012345678901234567890123456789012345678', check_outcomes: { irn_verified: { outcome: 'pass', detail: 'IRN active on GST portal', checked_at: '2026-05-02T09:00:00Z' }, buyer_ack: { outcome: 'pass', detail: 'Acknowledged by buyer signatory', checked_at: '2026-05-02T10:00:00Z' }, duplicate_check: { outcome: 'pass', detail: 'No duplicate found', checked_at: '2026-05-02T09:05:00Z' } } },
+    invoice: { invoice_number: 'INV-2026-0042', face_value: 5125000, tenor_days: 90, due_date: '2026-08-20', invoice_date: '2026-05-01', irn: 'IRN123456789012345678901234567890123456789012345678', check_outcomes: { irn_validity: { outcome: 'pass', detail: 'IRN active on GST portal', checked_at: '2026-05-02T09:00:00Z' }, buyer_ack: { outcome: 'pass', detail: 'Acknowledged by buyer signatory', checked_at: '2026-05-02T10:00:00Z' }, duplicate_check: { outcome: 'pass', detail: 'No duplicate found', checked_at: '2026-05-02T09:05:00Z' } } },
     buyer: { name: 'Reliance Industries Ltd', sector: 'Energy', rating: 'AA+', rating_source: 'CRISIL' },
     supplier: { name: 'Alpha Components Pvt Ltd', constitution_type: 'private_limited' },
     subscription: null,
   },
 
+  // S13 — Portfolio + statements. TDS ledger + statements ARE backed:
+  //   GET /investors/{id}/tax/deductions?fy= → [{listing_id,fy_code,gross_paise,tds_amount_paise,fee_paise,net_paise,challan_ref}]
+  //   GET /investors/{id}/tax/statements → [{period,kind,generated_at,doc_hash}] (kind ∈ monthly_portfolio|form_16a)
+  //   Form 16A: POST/GET /investors/{id}/tax/form-16a/{fyCode}.
+  // GAP G11: portfolio (subscriptions list + summary) has no per-investor list endpoint — UI-composed.
+  // subscription status ∈ sub_subscription_status: committed|funds_pending|funds_received|confirmed|
+  //   assignment_executed|distribution_received|closed|cancelled_by_investor|refunded|loss_realised.
   S13: {
     investor: { investor_id: 'inv-acct-001', sub_type: 'resident_individual', pan: 'ABCDE1234F', aadhaar_last4: '7890', bank_account_last4: '4321', activated_at: '2026-04-01T00:00:00Z', kyc_refresh_due_at: '2027-04-01T00:00:00Z', status: 'active' },
     summary: { total_deployed_paise: 3000000, total_returned_paise: 1050000, active_positions: 2, matured_positions: 1 },
@@ -337,6 +421,9 @@ const mockData = {
     ],
   },
 
+  // S14 — Supplier portal. GAP G12: per-supplier invoice/listing tracker has no read endpoint.
+  // Supplier self-service create is NOT built backend-side (listings are ops-created via POST /listings +
+  // two-phase POST /documents upload). GET /suppliers/{id} returns status+version only.
   S14: {
     supplier: {
       supplier_id: 'sup-001',
@@ -420,6 +507,9 @@ const mockData = {
     ],
   },
 
+  // S15 — Buyer portal. Ack user logs in OTP-only (verify-otp flow). GAP G13: buyer-facing reads
+  // (invoice list, payment instruction, NOA) and buyer SELF-ack have no endpoint — buyer ack is currently
+  // recorded admin-side via POST /listings/{id}/record-buyer-ack. All buyer-portal data below is UI-composed.
   S15: {
     login: {
       email: 'procurement@reliance.com',
