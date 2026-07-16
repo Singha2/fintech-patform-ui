@@ -7,6 +7,7 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const VARIANTS = [
   { id: 'normal',              label: 'Normal' },
@@ -17,18 +18,19 @@ const VARIANTS = [
 const TODAY = new Date()
 
 export default function S15() {
+  const { buyerInvoices, acknowledgeInvoice } = useStore()
   const [variant, setVariant] = useState('normal')
   const [email, setEmail] = useState(mockData.S15.login.email)
   const [otpSent, setOtpSent] = useState(false)
   const [otp, setOtp] = useState('')
   const [verified, setVerified] = useState(false)
-  const [invoices, setInvoices] = useState(mockData.S15.invoices)
   const [confirmInv, setConfirmInv] = useState(null)
 
   const { buyer, payment_instruction: pi } = mockData.S15
+  const invoices = buyerInvoices(buyer.buyer_id)
 
   function acknowledge(id) {
-    setInvoices(p => p.map(i => i.invoice_id === id ? { ...i, ack_status: 'acknowledged', acknowledged_at: new Date().toISOString() } : i))
+    acknowledgeInvoice(id)   // 🔗 buyer self-ack (WS-2); also stamps buyer_ack so ops (S5) reflects it (G-B3)
     setConfirmInv(null)
   }
 

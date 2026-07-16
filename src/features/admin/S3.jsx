@@ -7,7 +7,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
-import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const VARIANTS = [
   { id: 'normal',                  label: 'Normal' },
@@ -27,15 +27,31 @@ const ACTION_LOG = [
 
 export default function S3() {
   const navigate = useNavigate()
+  const { listSuppliers, createSupplier: storeCreateSupplier, advanceSupplier } = useStore()
   const [variant, setVariant]     = useState('normal')
   const [actingAs, setActingAs]   = useState(null)
   const [step, setStep]           = useState(0)
   const [tab, setTab]             = useState('onboarding')
 
+  const suppliers = listSuppliers()
+
   function openSupplier(supplier) {
     setActingAs(supplier)
     setStep(STATUS_TO_STEP[supplier.status] ?? 0)
     setTab('onboarding')
+  }
+
+  function createSupplier() {
+    const draft = {
+      supplier_id: `sup-new-${Date.now()}`,
+      legal_name: `New Supplier ${suppliers.length + 1} (draft)`,
+      constitution_type: 'private_limited',
+      pan: '', gstin: '', cin: '',
+      status: 'created',
+      agency_consent: { consent_id: 'con-new', scope: ['invoice_submission', 'kyc_upload', 'financial_profile'], granted_at: new Date().toISOString(), is_active: true },
+    }
+    storeCreateSupplier(draft)   // 🔗 POST /suppliers/create
+    openSupplier(draft)
   }
 
   const listColumns = [
@@ -62,9 +78,9 @@ export default function S3() {
         </div>
         <div className="flex justify-between items-center mb-3">
           <h2 className="text-sm font-semibold text-gray-700">Suppliers</h2>
-          <Button className="text-xs py-1.5 px-4">+ Create New Supplier</Button>
+          <Button className="text-xs py-1.5 px-4" onClick={createSupplier}>+ Create New Supplier</Button>
         </div>
-        <Table columns={listColumns} rows={mockData.S3.suppliers} />
+        <Table columns={listColumns} rows={suppliers} />
         <p className="text-xs text-gray-400 mt-2">Rules: DL-012 (admin-assisted) · DL-013/AC.3 (all actions emit AgencyAction) · C24 (verified via GST/MCA)</p>
       </div>
     )
@@ -213,7 +229,7 @@ export default function S3() {
               <div className="text-center py-6">
                 <p className="text-sm text-gray-700 mb-1">Master Agency Agreement ready for supplier's authorised signatory.</p>
                 <p className="text-xs text-gray-400 mb-4">AC.2: e-sign is non-delegable — supplier's signatory must sign directly.</p>
-                <Button disabled={noConsent} onClick={() => setStep(6)}>Initiate MAA e-Sign (Mock)</Button>
+                <Button disabled={noConsent} onClick={() => { advanceSupplier(actingAs.supplier_id, 'active'); setStep(6) }}>Initiate MAA e-Sign (Mock)</Button>
               </div>
             </Card>
           )}
@@ -225,7 +241,7 @@ export default function S3() {
                 <p className="font-semibold text-gray-900">Supplier Activated</p>
                 <p className="text-sm text-gray-500 mt-1">{actingAs.legal_name} is now active on the platform.</p>
                 <div className="flex justify-center gap-3 mt-4">
-                  <Button onClick={() => navigate('/s14')}>Open Supplier Portal →</Button>
+                  <Button onClick={() => navigate('/s14', { state: { supplierId: actingAs.supplier_id } })}>Open Supplier Portal →</Button>
                   <Button variant="ghost" onClick={() => setActingAs(null)}>← Back to Supplier List</Button>
                 </div>
               </div>

@@ -7,22 +7,23 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate, formatDatetime } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const REC_COLOR = { matched: 'green', partial: 'amber', unmatched: 'red' }
 
 export default function S7() {
   const navigate = useNavigate()
+  // Store-driven (P4): distributions drafted on disbursement (S6); maturity + execution close the deal and land
+  // the payout on the investor's S13 portfolio (G-E4). Reconciliation stays local (G6 — no read endpoint).
+  const { distributionsList, recordMaturity, executeDistribution } = useStore()
   const [tab, setTab]       = useState('distributions')
-  const [selected, setSelected] = useState(null)
-  const [distributions, setDistributions] = useState(mockData.S7.distributions)
+  const [selectedId, setSelectedId] = useState(null)
+  const [recon, setRecon] = useState(mockData.S7.reconciliation)
 
-  function executeDistribution(distId) {
-    setDistributions(prev => prev.map(d =>
-      d.distribution_id === distId
-        ? { ...d, status: 'executed', investors: d.investors.map((inv, i) => ({ ...inv, utr: `UTR${Date.now()}${i}` })) }
-        : d
-    ))
-    setSelected(prev => prev ? { ...prev, status: 'executed' } : prev)
+  const distributions = distributionsList()
+
+  function raiseShortfall(recId) {
+    setRecon(prev => prev.map(r => (r.rec_id === recId ? { ...r, status: 'shortfall_raised' } : r)))
   }
 
   const distColumns = [
@@ -31,7 +32,7 @@ export default function S7() {
     { key: 'maturity_date', label: 'Maturity', render: row => formatDate(row.maturity_date) },
     { key: 'buyer_payment_ref', label: 'Payment Ref' },
     { key: 'status',       label: 'Status', render: row => <StatusBadge label={row.status.replace(/_/g, ' ')} color={row.status === 'executed' ? 'green' : 'amber'} /> },
-    { key: 'action',       label: '',       render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => setSelected(row)}>Open →</Button> },
+    { key: 'action',       label: '',       render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => setSelectedId(row.distribution_id)}>Open →</Button> },
   ]
 
   const recColumns = [
@@ -43,13 +44,13 @@ export default function S7() {
     { key: 'reconciled_at',  label: 'Reconciled',   render: row => formatDatetime(row.reconciled_at) },
     { key: 'txn_ref',        label: 'Txn Ref' },
     { key: 'action',         label: '',             render: row => row.status !== 'matched'
-        ? <Button variant="ghost" className="text-xs py-1 px-3 text-amber-700">Raise Shortfall</Button>
+        ? <Button variant="ghost" className="text-xs py-1 px-3 text-amber-700" disabled={row.status === 'shortfall_raised'} onClick={() => raiseShortfall(row.rec_id)}>{row.status === 'shortfall_raised' ? 'Shortfall Raised ✓' : 'Raise Shortfall'}</Button>
         : null
     },
   ]
 
-  const selDist = selected
-    ? distributions.find(d => d.distribution_id === selected.distribution_id) ?? selected
+  const selDist = selectedId
+    ? distributions.find(d => d.distribution_id === selectedId) ?? null
     : null
 
   return (
@@ -59,7 +60,7 @@ export default function S7() {
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-5">
         {[['distributions', 'Distributions'], ['reconciliation', 'Reconciliation']].map(([id, label]) => (
-          <button key={id} onClick={() => { setTab(id); setSelected(null) }}
+          <button key={id} onClick={() => { setTab(id); setSelectedId(null) }}
             className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${tab === id ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
             {label}
           </button>
@@ -77,7 +78,7 @@ export default function S7() {
             <div className="lg:col-span-3 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-gray-900">{selDist.buyer_name} — {selDist.listing_id}</h2>
-                <button className="text-xs text-gray-400 hover:text-gray-700" onClick={() => setSelected(null)}>✕</button>
+                <button className="text-xs text-gray-400 hover:text-gray-700" onClick={() => setSelectedId(null)}>✕</button>
               </div>
 
               <Card title="Buyer Payment">
@@ -112,12 +113,17 @@ export default function S7() {
                   </table>
                 </div>
 
-                {selDist.status !== 'executed' ? (
-                  <Button className="mt-4" onClick={() => executeDistribution(selDist.distribution_id)}>
+                {selDist.status === 'executed' ? (
+                  <div className="mt-4 flex items-center gap-2"><StatusBadge label="All Distributions Executed" color="green" /></div>
+                ) : !selDist.matured ? (
+                  <div className="mt-4">
+                    <Button onClick={() => recordMaturity(selDist.listing_id, { amount_paise: selDist.buyer_payment_amount_paise })}>Record Maturity (buyer repayment)</Button>
+                    <p className="text-xs text-gray-400 mt-2">C23: buyer repayment must be recorded before distribution executes.</p>
+                  </div>
+                ) : (
+                  <Button className="mt-4" onClick={() => executeDistribution(selDist.listing_id)}>
                     Execute Distributions (T+1 · DL-030)
                   </Button>
-                ) : (
-                  <div className="mt-4 flex items-center gap-2"><StatusBadge label="All Distributions Executed" color="green" /></div>
                 )}
               </Card>
             </div>
@@ -129,7 +135,7 @@ export default function S7() {
       {tab === 'reconciliation' && (
         <div>
           <p className="text-xs text-gray-400 mb-3">G6: Last reconciled — {formatDatetime('2026-05-18T11:00:00Z')} · C23: Actual inflow must match before distribution executes.</p>
-          <Table columns={recColumns} rows={mockData.S7.reconciliation} />
+          <Table columns={recColumns} rows={recon} />
           {/* TBD: Shortfall collections escalation (BC6) — separate sub-tab or queue? */}
         </div>
       )}

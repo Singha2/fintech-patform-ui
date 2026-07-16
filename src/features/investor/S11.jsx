@@ -5,7 +5,7 @@ import Card from '../../components/kit/Card.jsx'
 import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import { formatPaise, formatRate, formatDate, fundingPct } from '../../utils/format.js'
-import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const VARIANTS = [
   { id: 'normal',             label: 'Normal' },
@@ -62,8 +62,10 @@ function ListingCard({ listing, onClick, disabled }) {
 
 export default function S11() {
   const navigate = useNavigate()
+  const { marketplaceListings } = useStore()
   const [variant, setVariant] = useState('normal')
-  const listings = mockData.S11.listings
+  // Live + fully-funded listings from the shared store — so a go-live approved on S5 shows up here (G-D3).
+  const listings = marketplaceListings()
 
   return (
     <div>

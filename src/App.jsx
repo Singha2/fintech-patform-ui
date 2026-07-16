@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { PERSONAS, SCREENS, LOGIN_PERSONA_MAP } from './routes.js'
+import { PlatformStoreProvider } from './store/PlatformStore.jsx'
 import { PersonaProvider, usePersona } from './context/PersonaContext.jsx'
 import Layout from './components/layout/Layout.jsx'
 import S1  from './features/admin/S1.jsx'
@@ -61,8 +62,10 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <PersonaProvider>
-      <AppRoutes />
-    </PersonaProvider>
+    <PlatformStoreProvider>
+      <PersonaProvider>
+        <AppRoutes />
+      </PersonaProvider>
+    </PlatformStoreProvider>
   )
 }

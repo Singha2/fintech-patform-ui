@@ -7,6 +7,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import { formatPaise, formatRupees, formatRate, formatDate, formatDatetime, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const VARIANTS = [
   { id: 'not_subscribed',          label: 'Not Subscribed' },
@@ -21,12 +22,31 @@ const CHECK_LABELS = {
   duplicate_check: 'Duplicate Check',
 }
 
+// The investor persona whose portfolio these commits land in (matches the seeded S13 investor).
+const INVESTOR = { id: 'inv-acct-001', name: 'Rahul Mehta' }
+
 export default function S12() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { listing, invoice, buyer, supplier } = mockData.S12
-  const selectedId = location.state?.listingId ?? listing.listing_id
-  const s11Listing = mockData.S11.listings.find(l => l.listing_id === selectedId) ?? {}
+  const { listingDetail, commitSubscription } = useStore()
+
+  // Resolve the clicked listing from the shared store (closes G-C3); fall back to the seeded sample for the
+  // demo listing and to fill fields a store-created listing may not carry (nested parties, VA, snapshot).
+  const sample = mockData.S12
+  const listingId = location.state?.listingId ?? sample.listing.listing_id
+  const detail = listingDetail(listingId)
+  const listing = detail?.listing ?? sample.listing
+  const invoice = detail?.invoice ?? sample.invoice
+  const buyer = {
+    name:          detail?.buyer?.legal_name ?? listing.buyer_name ?? sample.buyer.name,
+    sector:        detail?.buyer?.sector ?? listing.buyer_sector ?? sample.buyer.sector,
+    rating:        detail?.buyer?.rating ?? sample.buyer.rating,
+    rating_source: detail?.buyer?.rating_source ?? sample.buyer.rating_source,
+  }
+  const supplier = {
+    name:              detail?.supplier?.legal_name ?? listing.supplier_name ?? sample.supplier.name,
+    constitution_type: detail?.supplier?.constitution_type ?? sample.supplier.constitution_type,
+  }
 
   const [variant, setVariant] = useState('not_subscribed')
   const [amount, setAmount] = useState('')
@@ -34,20 +54,28 @@ export default function S12() {
   const [copied, setCopied] = useState(false)
   const [amountErr, setAmountErr] = useState('')
 
-  const rateBps = listing.pricing_snapshot.rate_bps
-  const feeBps = listing.pricing_snapshot.fee_bps
-  const tenorDays = invoice.tenor_days
+  // Normalized display fields — a store-created listing may lack a pricing snapshot / VA until go-live.
+  const rateBps = listing.pricing_snapshot?.rate_bps ?? listing.rate_bps ?? 0
+  const feeBps = listing.pricing_snapshot?.fee_bps ?? 50
+  const snapshotAt = listing.pricing_snapshot?.snapshot_at ?? null
+  const vaNumber = listing.virtual_account_number ?? sample.listing.virtual_account_number
+  const vaIfsc = listing.virtual_account_ifsc ?? sample.listing.virtual_account_ifsc
+  const committedTotal = listing.committed_total ?? 0
+  const fundingTarget = listing.funding_target ?? 0
+  const tenorDays = invoice?.tenor_days ?? listing.tenor_days ?? 0
   const amtNum = parseFloat(amount) || 0
   const grossReturn = amtNum * (rateBps / 10000) * (tenorDays / 365)
   const tdsAmt = grossReturn * 0.10
   const netReturn = grossReturn - tdsAmt
-  const pct = fundingPct(listing.committed_total, listing.funding_target)
+  const pct = fundingPct(committedTotal, fundingTarget)
 
   function handleCommit() {
     if (amtNum < 10000) { setAmountErr('Minimum investment is ₹10,000 (DL-007).'); return }
-    if (listing.committed_total + amtNum * 100 > listing.funding_target) { setAmountErr('Amount exceeds remaining headroom (G10/L.2).'); return }
+    if (committedTotal + amtNum * 100 > fundingTarget) { setAmountErr('Amount exceeds remaining headroom (G10/L.2).'); return }
     setAmountErr('')
-    setSubscription({ subscription_id: 'sub-new', amount: amtNum * 100, status: 'committed' })
+    // 🔗 POST /listings/{id}/subscriptions/commit — writes to the store so S6 (disbursement) + S13 (portfolio) see it.
+    const subId = commitSubscription(listingId, { investor_id: INVESTOR.id, investor_name: INVESTOR.name, amount_paise: amtNum * 100 })
+    setSubscription({ subscription_id: subId ?? 'sub-new', amount: amtNum * 100, status: 'committed' })
     setVariant('committed')
   }
 
@@ -65,8 +93,8 @@ export default function S12() {
         <Button variant="ghost" className="text-xs" onClick={() => navigate('/s11')}>← Back to Listings</Button>
       </div>
       <PageHeader
-        title={s11Listing.buyer_name ?? listing.listing_id}
-        subtitle={`Listing ${listing.listing_id} · ${s11Listing.buyer_sector ?? ''}`}
+        title={buyer.name ?? listing.listing_id}
+        subtitle={`Listing ${listing.listing_id} · ${buyer.sector ?? ''}`}
       />
 
       {/* State variant switcher */}
@@ -90,8 +118,8 @@ export default function S12() {
               <StatusBadge label={listing.status === 'live' ? 'Live' : 'Fully Funded'} color={listing.status === 'live' ? 'green' : 'gray'} />
             </div>
             <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm mb-4">
-              <div><p className="text-xs text-gray-400">Funding Target</p><p className="font-semibold text-gray-900">{formatPaise(listing.funding_target)}</p></div>
-              <div><p className="text-xs text-gray-400">Committed</p><p className="font-semibold text-gray-900">{formatPaise(listing.committed_total)}</p></div>
+              <div><p className="text-xs text-gray-400">Funding Target</p><p className="font-semibold text-gray-900">{formatPaise(fundingTarget)}</p></div>
+              <div><p className="text-xs text-gray-400">Committed</p><p className="font-semibold text-gray-900">{formatPaise(committedTotal)}</p></div>
               <div><p className="text-xs text-gray-400">Rate</p><p className="font-semibold text-gray-900">{formatRate(rateBps)}</p></div>
               <div><p className="text-xs text-gray-400">Platform Fee</p><p className="font-semibold text-gray-900">{(feeBps / 100).toFixed(2)}%</p></div>
             </div>
@@ -101,7 +129,7 @@ export default function S12() {
             <div className="w-full bg-gray-100 rounded-full h-2 mb-2">
               <div className="bg-indigo-500 h-2 rounded-full" style={{ width: `${pct}%` }} />
             </div>
-            <p className="text-xs text-gray-400">Window closes {formatDate(listing.funding_window_close_at)} · Pricing snapshot {formatDatetime(listing.pricing_snapshot.snapshot_at)}</p>
+            <p className="text-xs text-gray-400">Window closes {formatDate(listing.funding_window_close_at)}{snapshotAt ? ` · Pricing snapshot ${formatDatetime(snapshotAt)}` : ''}</p>
           </Card>
 
           {/* Invoice */}
@@ -115,7 +143,7 @@ export default function S12() {
             </div>
             <div className="mb-3">
               <p className="text-xs text-gray-400 mb-1">IRN</p>
-              <p className="font-mono text-xs text-gray-700 break-all">{invoice.irn.slice(0, 24)}…</p>
+              <p className="font-mono text-xs text-gray-700 break-all">{invoice.irn ? `${invoice.irn.slice(0, 24)}…` : '—'}</p>
             </div>
             <div className="overflow-x-auto rounded-lg border border-gray-100">
               <table className="min-w-full text-xs">
@@ -125,7 +153,7 @@ export default function S12() {
                   <th className="px-3 py-2 text-left text-gray-500 font-medium">Detail</th>
                 </tr></thead>
                 <tbody className="divide-y divide-gray-100">
-                  {Object.entries(invoice.check_outcomes).map(([key, val]) => (
+                  {Object.entries(invoice.check_outcomes ?? {}).map(([key, val]) => (
                     <tr key={key}>
                       <td className="px-3 py-2 text-gray-700">{CHECK_LABELS[key] ?? key}</td>
                       <td className="px-3 py-2"><StatusBadge label={val.outcome} color={val.outcome === 'pass' ? 'green' : 'red'} /></td>
@@ -232,13 +260,13 @@ export default function S12() {
                     <div className="flex justify-between items-center">
                       <span className="text-gray-500 text-xs">VA Number</span>
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-gray-900 text-xs">{listing.virtual_account_number}</span>
+                        <span className="font-mono text-gray-900 text-xs">{vaNumber}</span>
                         <button onClick={handleCopy} className="text-indigo-600 text-xs hover:underline">{copied ? 'Copied!' : 'Copy'}</button>
                       </div>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500 text-xs">IFSC</span>
-                      <span className="font-mono text-gray-900 text-xs">{listing.virtual_account_ifsc}</span>
+                      <span className="font-mono text-gray-900 text-xs">{vaIfsc}</span>
                     </div>
                     <p className="text-xs text-gray-400 mt-2">Transfer from your registered bank account only.</p>
                   </div>

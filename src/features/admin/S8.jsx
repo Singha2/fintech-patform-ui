@@ -8,7 +8,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatDate } from '../../utils/format.js'
-import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const STATUS_COLOR = { pending: 'amber', consumed: 'green', expired: 'gray', revoked: 'red' }
 
@@ -21,34 +21,24 @@ function addDays(days) {
 export default function S8() {
   const navigate = useNavigate()
   const { currentPersona } = usePersona()
-  const [invites, setInvites] = useState(mockData.S8.invites)
+  const { listInvites, issueInvite, revokeInvite } = useStore()
   const [form, setForm]       = useState({ email: '', phone: '', justification: '', referrer: '' })
   const [successMsg, setSuccessMsg] = useState('')
 
+  const invites = listInvites()
   const isCompliance = currentPersona.id === 'compliance-reviewer'
 
   function handleIssue() {
     if (!form.email || !form.phone || !form.justification) return
-    const newInvite = {
-      invite_id: `inv-i-${Date.now()}`,
-      email_display: form.email,
-      phone_display: form.phone,
-      issued_by: currentPersona.name,
-      issued_at: new Date().toISOString(),
-      expiry_at: addDays(14),
-      status: 'pending',
-      consumed_at: null,
-      justification: form.justification,
-      referrer: form.referrer,
-    }
-    setInvites(prev => [newInvite, ...prev])
-    setSuccessMsg(`Invite sent to ${form.email}. Expires ${formatDate(newInvite.expiry_at)}.`)
+    const expiry_at = addDays(14)
+    issueInvite({   // 🔗 POST /investor-invites/issue
+      email_display: form.email, phone_display: form.phone, issued_by: currentPersona.name,
+      issued_at: new Date().toISOString(), expiry_at, consumed_at: null,
+      justification: form.justification, referrer: form.referrer,
+    })
+    setSuccessMsg(`Invite sent to ${form.email}. Expires ${formatDate(expiry_at)}.`)
     setForm({ email: '', phone: '', justification: '', referrer: '' })
     setTimeout(() => setSuccessMsg(''), 5000)
-  }
-
-  function revokeInvite(id) {
-    setInvites(prev => prev.map(i => i.invite_id === id ? { ...i, status: 'revoked' } : i))
   }
 
   const columns = [
@@ -60,7 +50,10 @@ export default function S8() {
     { key: 'status',         label: 'Status',   render: row => <StatusBadge label={row.status} color={STATUS_COLOR[row.status] ?? 'gray'} /> },
     { key: 'consumed_at',    label: 'Consumed', render: row => row.consumed_at ? formatDate(row.consumed_at) : '—' },
     { key: 'action',         label: '',         render: row => row.status === 'pending'
-        ? <Button variant="ghost" className="text-xs py-1 px-3 text-red-600 border-red-200" onClick={() => revokeInvite(row.invite_id)}>Revoke</Button>
+        ? <div className="flex gap-1 justify-end">
+            <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => navigate('/s10')}>Onboard →</Button>
+            <Button variant="ghost" className="text-xs py-1 px-3 text-red-600 border-red-200" onClick={() => revokeInvite(row.invite_id)}>Revoke</Button>
+          </div>
         : null
     },
   ]

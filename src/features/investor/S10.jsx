@@ -6,6 +6,7 @@ import FormField from '../../components/kit/FormField.jsx'
 import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const STAGES = ['Sign Up', 'Identity', 'KYC Upload', 'Financial Profile', 'Bank & Tax', 'Approval', 'MIA e-Sign', 'Activated']
 
@@ -83,6 +84,7 @@ function ProgressBar({ activeStep }) {
 
 export default function S10() {
   const navigate = useNavigate()
+  const { advanceInvestor } = useStore()
   const [variant, setVariant] = useState('normal')
   const [step, setStep] = useState(STATUS_TO_STEP[mockData.S10.investor.status] ?? 0)
   const [suitabilityAcked, setSuitabilityAcked] = useState(false)
@@ -275,7 +277,7 @@ export default function S10() {
             <p className="text-sm text-gray-500 mb-4">Your investor account is now active. You can browse available listings and start investing.</p>
             <StatusBadge label="Active" color="green" />
             <div className="mt-6">
-              <Button onClick={() => navigate('/s11')}>Browse Listings →</Button>
+              <Button onClick={() => { advanceInvestor(mockData.S10.investor.investor_id, 'active'); navigate('/s11') }}>Browse Listings →</Button>
             </div>
           </div>
         </Card>

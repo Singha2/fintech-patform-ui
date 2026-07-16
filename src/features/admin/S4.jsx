@@ -8,6 +8,7 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 // buyer_account_status lifecycle (backend): nominated → identity_verified → credit_assessed → engagement_started → active
 const STATUS_COLOR = { nominated: 'gray', identity_verified: 'amber', credit_assessed: 'amber', engagement_started: 'amber', active: 'green', suspended: 'red' }
@@ -22,21 +23,34 @@ const STAGE_ACTIONS = {
 
 export default function S4() {
   const navigate = useNavigate()
+  const { listBuyers, getBuyer, advanceBuyer, setBuyerCredit } = useStore()
   const [selected, setSelected]     = useState(null)
   const [fourEyes, setFourEyes]     = useState(false)
-  const [buyerStatuses, setBuyerStatuses] = useState(
-    Object.fromEntries(mockData.S4.buyers.map(b => [b.buyer_id, b.status]))
-  )
+  const [limitInput, setLimitInput] = useState('')
+  const [savedMsg, setSavedMsg]     = useState('')
   const [approver, setApprover] = useState('')
 
-  const buyers = mockData.S4.buyers.map(b => ({ ...b, status: buyerStatuses[b.buyer_id] }))
+  const buyers = listBuyers()
+
+  function openBuyer(row) {
+    setSelected(row)
+    setLimitInput(row.credit_limit_paise ? String(row.credit_limit_paise / 100) : '')
+    setSavedMsg('')
+  }
+
+  function saveCreditLimit() {
+    const paise = Math.round(Number(limitInput) * 100)
+    if (!Number.isFinite(paise) || paise <= 0) { setSavedMsg('Enter a valid amount'); return }
+    setBuyerCredit(selected.buyer_id, paise)   // 🔗 POST /credit/buyers/{id}/profile
+    setSavedMsg(`Credit limit set to ${formatPaise(paise)} (mock)`)
+  }
   const pricingBands = selected
     ? mockData.S4.pricing_bands.filter(pb => pb.buyer_id === selected.buyer_id)
     : []
 
   function advanceStatus(buyer) {
     const action = STAGE_ACTIONS[buyer.status]
-    if (action) setBuyerStatuses(s => ({ ...s, [buyer.buyer_id]: action.next }))
+    if (action) advanceBuyer(buyer.buyer_id, action.next)   // 🔗 the buyer transition chain
   }
 
   const listColumns = [
@@ -46,7 +60,7 @@ export default function S4() {
     { key: 'credit_limit_paise', label: 'Credit Limit', render: row => row.credit_limit_paise ? formatPaise(row.credit_limit_paise) : '—' },
     { key: 'status',            label: 'Status',        render: row => <StatusBadge label={row.status.replace(/_/g, ' ')} color={STATUS_COLOR[row.status] ?? 'gray'} /> },
     { key: 'last_review_at',    label: 'Last Review',   render: row => row.last_review_at ? formatDate(row.last_review_at) : '—' },
-    { key: 'action',            label: '',              render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => setSelected({ ...row, status: buyerStatuses[row.buyer_id] })}>Open →</Button> },
+    { key: 'action',            label: '',              render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => openBuyer(row)}>Open →</Button> },
   ]
 
   const bandColumns = [
@@ -55,9 +69,10 @@ export default function S4() {
     { key: 'fee_bps',      label: 'Fee',    render: row => `${(row.fee_bps / 100).toFixed(2)}%` },
   ]
 
-  const currentStatus = selected ? buyerStatuses[selected.buyer_id] : null
+  const currentBuyer  = selected ? getBuyer(selected.buyer_id) : null
+  const currentStatus = currentBuyer?.status ?? null
   const stageAction   = currentStatus ? STAGE_ACTIONS[currentStatus] : null
-  const isFourEyes    = fourEyes || (selected?.credit_limit_paise ?? 0) > 1000000000
+  const isFourEyes    = fourEyes || (currentBuyer?.credit_limit_paise ?? 0) > 1000000000
 
   return (
     <div>
@@ -101,7 +116,7 @@ export default function S4() {
             <Card title="Credit Profile">
               <div className="flex flex-col gap-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <FormField label="Credit Limit (₹)" id="cl" placeholder="e.g. 1000000" defaultValue={selected.credit_limit_paise ? selected.credit_limit_paise / 100 : ''} type="number" />
+                  <FormField label="Credit Limit (₹)" id="cl" placeholder="e.g. 1000000" value={limitInput} onChange={e => setLimitInput(e.target.value)} type="number" />
                   <FormField label="Tenor Cap (days)"  id="tc" placeholder="90" type="number" defaultValue={selected.tenor_cap_days ?? ''} />
                 </div>
 
@@ -118,7 +133,8 @@ export default function S4() {
                   </div>
                 )}
 
-                <Button disabled={isFourEyes && !approver}>Set / Update Credit Limit</Button>
+                <Button disabled={isFourEyes && !approver} onClick={saveCreditLimit}>Set / Update Credit Limit</Button>
+                {savedMsg && <p className="text-xs text-green-600">{savedMsg}</p>}
                 <p className="text-xs text-gray-400">G20: Credit limit changes don't affect in-flight listings.</p>
 
                 {pricingBands.length > 0 && (
@@ -140,7 +156,12 @@ export default function S4() {
               </Card>
             )}
             {currentStatus === 'active' && (
-              <Card><div className="flex items-center gap-2"><StatusBadge label="Active" color="green" /><span className="text-sm text-gray-600">Buyer fully onboarded.</span></div></Card>
+              <Card>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-2"><StatusBadge label="Active" color="green" /><span className="text-sm text-gray-600">Buyer fully onboarded.</span></div>
+                  <Button variant="ghost" className="text-xs" onClick={() => navigate('/s15')}>Open Buyer Portal →</Button>
+                </div>
+              </Card>
             )}
           </div>
         )}

@@ -8,7 +8,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
-import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 // cash_payout_status: drafted|approved|sent|executed|partial|failed|completed
 const STATUS_COLOR = { drafted: 'amber', approved: 'amber', sent: 'amber', executed: 'green', partial: 'amber', failed: 'red', completed: 'green' }
@@ -16,10 +16,12 @@ const STATUS_COLOR = { drafted: 'amber', approved: 'amber', sent: 'amber', execu
 export default function S6() {
   const navigate = useNavigate()
   const { currentPersona } = usePersona()
-  const [disbursements, setDisbursements] = useState(mockData.S6.disbursements)
-  const [selected, setSelected] = useState(null)
+  // Store-driven (P4): a fully-funded listing's disbursement is drafted at S12 commit and surfaces here (G-E1).
+  const { disbursementQueue, approveDisbursement } = useStore()
+  const [selectedId, setSelectedId] = useState(null)
   const [showMfa, setShowMfa]   = useState(false)
 
+  const disbursements = disbursementQueue()
   const isMaker    = currentPersona.id === 'ops-treasury'
   const isTreasury = currentPersona.id === 'treasury-settlement' || currentPersona.id === 'ops-treasury'
 
@@ -27,12 +29,7 @@ export default function S6() {
 
   function onMfaConfirm() {
     setShowMfa(false)
-    setDisbursements(prev => prev.map(d =>
-      d.disbursement_id === selected.disbursement_id
-        ? { ...d, status: 'executed', executed_at: new Date().toISOString(), utr: `UTR${Date.now()}` }
-        : d
-    ))
-    setSelected(prev => ({ ...prev, status: 'executed', utr: `UTR${Date.now()}` }))
+    if (sel) approveDisbursement(sel.listing_id)  // 🔗 POST /listings/{id}/disbursement/approve
     navigate('/s7')
   }
 
@@ -43,10 +40,10 @@ export default function S6() {
     { key: 'due_disbursement_date', label: 'Due Date (T+1)',  render: row => formatDate(row.due_disbursement_date) },
     { key: 'all_signed',       label: 'All Signed (C27)',    render: row => <StatusBadge label={row.all_signed ? '✓ Yes' : '✗ No'} color={row.all_signed ? 'green' : 'red'} /> },
     { key: 'status',           label: 'Status',             render: row => <StatusBadge label={row.status.replace(/_/g, ' ')} color={STATUS_COLOR[row.status] ?? 'gray'} /> },
-    { key: 'action',           label: '',                   render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => setSelected(row)}>Open →</Button> },
+    { key: 'action',           label: '',                   render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => setSelectedId(row.disbursement_id)}>Open →</Button> },
   ]
 
-  const sel = selected ? disbursements.find(d => d.disbursement_id === selected.disbursement_id) ?? selected : null
+  const sel = selectedId ? disbursements.find(d => d.disbursement_id === selectedId) ?? null : null
 
   return (
     <div>
@@ -62,7 +59,7 @@ export default function S6() {
           <div className="lg:col-span-3 flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-gray-900">{sel.supplier_name}</h2>
-              <button className="text-xs text-gray-400 hover:text-gray-700" onClick={() => setSelected(null)}>✕</button>
+              <button className="text-xs text-gray-400 hover:text-gray-700" onClick={() => setSelectedId(null)}>✕</button>
             </div>
 
             <Card title="Disbursement Detail">

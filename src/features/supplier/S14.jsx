@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/kit/Button.jsx'
 import Card from '../../components/kit/Card.jsx'
 import FormField from '../../components/kit/FormField.jsx'
@@ -8,6 +8,7 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
 
 const VARIANTS = [
   { id: 'normal',                  label: 'Normal' },
@@ -24,14 +25,18 @@ const MOCK_GST = { invoice_number: 'INV-2026-0062', face_value: '4500000', invoi
 
 export default function S14() {
   const navigate = useNavigate()
+  const location = useLocation()
+  const { getSupplier, supplierInvoices, submitInvoice: storeSubmitInvoice } = useStore()
   const [variant, setVariant] = useState('normal')
   const [tab, setTab] = useState('invoices')
   const [expandedId, setExpandedId] = useState(null)
-  const [invoices, setInvoices] = useState(mockData.S14.invoices)
   const [mode, setMode] = useState('irn')
   const [draft, setDraft] = useState({ irn: '', invoice_number: '', buyer_id: '', face_value: '', invoice_date: '', tenor_days: '' })
 
-  const { supplier } = mockData.S14
+  // The supplier whose portal this is — passed from S3 "Open Supplier Portal →" (falls back to the seeded one).
+  const supplierId = location.state?.supplierId ?? mockData.S14.supplier.supplier_id
+  const supplier = getSupplier(supplierId) ?? mockData.S14.supplier
+  const invoices = supplierInvoices(supplierId)
   const consentOff = variant === 'agency_consent_inactive'
   const checksFailed = variant === 'ops_checks_failed'
 
@@ -39,12 +44,13 @@ export default function S14() {
 
   function submitInvoice() {
     const buyer = mockData.S14.available_buyers.find(b => b.buyer_id === draft.buyer_id)
-    setInvoices(p => [{
-      invoice_id: `inv-${Date.now()}`, invoice_number: draft.invoice_number || MOCK_GST.invoice_number,
-      buyer_name: buyer?.legal_name ?? '—', face_value: parseInt(draft.face_value) || 0,
+    storeSubmitInvoice({   // 🔗 POST /documents + POST /listings (ops-created)
+      invoice_number: draft.invoice_number || MOCK_GST.invoice_number,
+      buyer_id: draft.buyer_id || null, buyer_name: buyer?.legal_name ?? '—', face_value: parseInt(draft.face_value) || 0,
       invoice_date: draft.invoice_date, due_date: '', tenor_days: parseInt(draft.tenor_days) || 0,
-      irn: mode === 'irn' ? draft.irn : null, status: 'submitted', listing: null,
-    }, ...p])
+      irn: mode === 'irn' ? draft.irn : null,
+      supplier_id: supplierId, supplier_name: supplier.legal_name, listing: null,
+    })
     setDraft({ irn: '', invoice_number: '', buyer_id: '', face_value: '', invoice_date: '', tenor_days: '' })
     setTab('invoices')
   }

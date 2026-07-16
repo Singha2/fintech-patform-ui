@@ -7,6 +7,10 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { useStore } from '../../store/PlatformStore.jsx'
+
+// The investor persona whose positions this portfolio shows (matches S12 commits).
+const INVESTOR = { id: 'inv-acct-001', name: 'Rahul Mehta' }
 
 const VARIANTS = [
   { id: 'normal',           label: 'Normal' },
@@ -27,7 +31,18 @@ export default function S13() {
   const navigate = useNavigate()
   const [variant, setVariant] = useState('normal')
   const [accountOpen, setAccountOpen] = useState(false)
-  const { investor, summary, subscriptions, tds, statements } = mockData.S13
+  const [downloadMsg, setDownloadMsg] = useState('')
+  // Positions + summary come from the store (P4 — reflect S12 commits and S7 distribution outcomes: G-E4);
+  // account details, TDS ledger, and statements stay from mockData (backed by their own endpoints).
+  const { investorPortfolio, investorSummary } = useStore()
+  const { investor, tds, statements } = mockData.S13
+  const subscriptions = investorPortfolio(INVESTOR.id)
+  const summary = investorSummary(INVESTOR.id)
+
+  function mockDownload(name) {  // 🔗 GET …/tax/form-16a/{fy} · GET …/tax/statements (mock stand-in)
+    setDownloadMsg(`${name} downloaded (mock)`)
+    setTimeout(() => setDownloadMsg(''), 4000)
+  }
 
   const isEmpty = variant === 'empty_portfolio'
   const isKycDue = variant === 'kyc_refresh_due'
@@ -98,7 +113,7 @@ export default function S13() {
     {
       key: 'challan', label: 'Challan / Form 16A',
       render: row => row.challan_ref
-        ? <Button variant="ghost" className="text-xs py-1 px-3">Download Form 16A</Button>
+        ? <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => mockDownload(`Form 16A ${row.fy_code}`)}>Download Form 16A</Button>
         : <span className="text-gray-400 text-xs">Pending</span>,
     },
   ]
@@ -108,12 +123,16 @@ export default function S13() {
     { key: 'period',       label: 'Period' },
     { key: 'kind',         label: 'Type',       render: row => row.kind === 'monthly_portfolio' ? 'Monthly Statement' : 'Form 16A' },
     { key: 'generated_at', label: 'Generated',  render: row => formatDate(row.generated_at) },
-    { key: 'action',       label: '',           render: () => <Button variant="ghost" className="text-xs py-1 px-3">Download</Button> },
+    { key: 'action',       label: '',           render: row => <Button variant="ghost" className="text-xs py-1 px-3" onClick={() => mockDownload(row.kind === 'monthly_portfolio' ? `Statement ${row.period}` : 'Form 16A')}>Download</Button> },
   ]
 
   return (
     <div>
       <PageHeader title="My Portfolio" subtitle="Active positions, returns, and statements" />
+
+      {downloadMsg && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">✓ {downloadMsg}</div>
+      )}
 
       {/* Variant switcher */}
       <div className="flex items-center gap-2 flex-wrap mb-6">

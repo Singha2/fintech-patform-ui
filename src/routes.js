@@ -33,6 +33,7 @@ export const SIDEBAR_GROUPS = ['Admin', 'Auditor', 'Investor', 'Supplier', 'Buye
 
 // Maps persona id → queue role keys in mockData.S2.queues
 export const PERSONA_ROLES = {
+  'super-admin':         ['super_admin', 'ops_executive', 'credit_reviewer', 'compliance_reviewer', 'treasury_and_settlement'],
   'ops-executive':       ['ops_executive'],
   'credit-reviewer':     ['credit_reviewer'],
   'ops-treasury':        ['ops_executive', 'treasury_and_settlement'],
