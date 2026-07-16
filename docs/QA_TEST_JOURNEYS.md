@@ -1,18 +1,18 @@
 # QA Test Journeys — Mock UI Walkthroughs
 
-> **For a Junior Dev / QA to independently exercise the mock end-to-end.** Covers the five business journeys —
-> **Supplier onboarding, Buyer onboarding, Investor onboarding, Listing the invoice, Money movement** — as
-> click-paths through the running mock, with the exact persona, screen, action, and expected result at each
-> step, the edge-case variants to test, and the backend command each step *represents* (for traceability to
-> `API_ALIGNMENT.md`).
+> **➡️ Testing the mock hands-on? Start with `MANUAL_TEST_PLAN.md`** — a step-by-step, junior-dev-friendly test
+> plan (setup, smoke test, golden path, per-area test suites, sign-off). **This doc** is the deeper reference:
+> the five journeys as detailed click-paths, the edge-case variants, the backend command each step *represents*
+> (traceability to `API_ALIGNMENT.md`), and the **continuity gap register** (§7).
 >
-> **Read this first — what the mock is and isn't.** This is a front-end-only mock (`CLAUDE.md`). Every screen
-> keeps its **own local state seeded from `src/data/mockData.js`**; screens do **not** share state, and there is
-> **no backend**. So a journey is walked partly by clicking within a screen and partly by **switching persona**
-> to reach the next actor's screen. Some cross-persona handoffs are **simulated** in the mock (called out as
+> **What the mock is and isn't.** This is a front-end-only mock (`CLAUDE.md`) — **no backend**. As of Tier 2 the
+> screens **share one in-memory store** (`src/store/`, seeded from `src/data/mockData.js`), so an upstream action
+> (submit an invoice, go live, subscribe) now shows up on the downstream screen. A journey is walked partly by
+> clicking within a screen and partly by **switching persona** to reach the next actor's screen. A refresh resets
+> the store to its seed. A few cross-persona handoffs are still **simulated** in the mock (called out as
 > **⚙️ Simulated** below) rather than being real data continuity. Every such simulation and every known gap is
-> listed in **§7 Coverage & Gap Register** with a recommended fix — that section is the backlog for making the
-> flow fully continuous.
+> listed in **§7 Coverage & Gap Register** with its fix and status — the continuity gaps are now all closed
+> (Tier 2 P2–P4); §7 records what changed.
 
 ---
 

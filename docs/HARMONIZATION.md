@@ -15,6 +15,7 @@
 | `API_ALIGNMENT.md` | contract truth — endpoint ↔ screen ↔ response shape, enum fixes, **read-gap register G1–G13** |
 | `INTEGRATION_PLAN.md` | the **UI build steps** (Phases 0–7): proxy, client, auth, service layer, documents, per-screen wiring |
 | `TIER2_SHARED_STORE_PLAN.md` | the **store-as-seam mechanism** + its phases (P1–P5) |
+| `MANUAL_TEST_PLAN.md` | the **junior-dev manual test plan** — setup, smoke test, golden path, test suites, sign-off |
 | `QA_TEST_JOURNEYS.md` | clickable QA journeys + the mock-continuity gap register (G-A…G-E) |
 | *backend repo* `docs/UI_INTEGRATION_BACKEND_SPEC.md` | the **backend additive endpoints BE-1…BE-16** |
 
