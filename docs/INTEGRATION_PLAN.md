@@ -1,5 +1,9 @@
 # UI ⇄ Backend Live Integration — Step-wise Executable Spec
 
+> 📍 **Cross-repo status & the single next-actions list live in the shared tracker:**
+> `../fintech-platform-backend/docs/PROJECT_TRACKER.md`. This doc is the **UI-side executable detail** that
+> tracker points to — do the steps here, but record *progress* (which screen is wired) in the tracker.
+
 > **Audience: a Claude Code session.** This document is the build plan for wiring the React mock
 > (`fintech-patform-mock`) to the live Spring Boot backend (`fintech-platform-backend`, served under
 > `/api/v1`). It is organised into **phases → numbered steps**. Each step is independently reviewable and
