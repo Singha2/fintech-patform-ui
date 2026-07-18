@@ -19,8 +19,9 @@ import S12 from './features/investor/S12.jsx'
 import S13 from './features/investor/S13.jsx'
 import S14 from './features/supplier/S14.jsx'
 import S15 from './features/buyer/S15.jsx'
+import S16 from './features/admin/S16.jsx'
 
-const PAGE_MAP = { S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15 }
+const PAGE_MAP = { S2, S3, S4, S5, S6, S7, S8, S9, S10, S11, S12, S13, S14, S15, S16 }
 
 function AppRoutes() {
   const { currentPersona, setPersonaById } = usePersona()

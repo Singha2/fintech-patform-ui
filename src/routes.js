@@ -14,10 +14,11 @@ export const SCREENS = [
   { id: 'S13', name: 'Investor portfolio + statements',    path: '/s13', group: 'Investor', persona: 'Investor' },
   { id: 'S14', name: 'Supplier portal',                    path: '/s14', group: 'Supplier', persona: 'Supplier' },
   { id: 'S15', name: 'Buyer portal',                       path: '/s15', group: 'Buyer',    persona: 'Buyer' },
+  { id: 'S16', name: 'Admin & Roles',                      path: '/s16', group: 'Admin',    persona: 'Super Admin' },
 ]
 
 export const PERSONAS = [
-  { id: 'super-admin',         name: 'Super Admin (Founder)', accessibleScreens: ['S1','S2','S3','S4','S5','S6','S7','S8'] },
+  { id: 'super-admin',         name: 'Super Admin (Founder)', accessibleScreens: ['S1','S2','S3','S4','S5','S6','S7','S8','S16'] },
   { id: 'ops-executive',       name: 'Ops Executive',         accessibleScreens: ['S1','S2','S3'] },
   { id: 'credit-reviewer',     name: 'Credit Reviewer',       accessibleScreens: ['S1','S2','S4'] },
   { id: 'ops-treasury',        name: 'Ops + Treasury',        accessibleScreens: ['S1','S2','S3','S5','S6','S7'] },
@@ -38,7 +39,7 @@ export const SIDEBAR_GROUPS = ['Admin', 'Auditor', 'Investor', 'Supplier', 'Buye
 // on S3, ops records maturity on S7) — those screens are NOT in that role's sidebar under this tight mapping.
 // Widen any row here if a role needs to reach a shared screen.
 const ROLE_SCREENS = {
-  super_admin:             ['S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S10', 'S14'],
+  super_admin:             ['S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S10', 'S14', 'S16'],
   ops_executive:           ['S2', 'S3', 'S5', 'S10', 'S14'],
   credit_reviewer:         ['S2', 'S4'],
   compliance_reviewer:     ['S2', 'S8'],

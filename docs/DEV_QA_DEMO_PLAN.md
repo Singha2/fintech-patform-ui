@@ -80,6 +80,7 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 ### F. Read / audit
 - [ ] **S13 portfolio + S11 marketplace**: log in as the **investor** (§5) → S11 lists live listings, S13 shows positions + summary + TDS. *(These are investor-role screens — reached by logging in as the investor, not a persona switch.)*
 - [ ] **S14 tracker**: the supplier's invoices + funding progress.
+- [ ] **S16 Admin & Roles** (super_admin only): log in as `super@` → **Admin & Roles** in the sidebar → **Provision** a new admin (email/name/phone) → copy the returned id → **Assign Role**. A soft-SoD role pair prompts for an override reason. *(Not in any other role's sidebar; non-super → 403.)*
 - [ ] **S9 audit log** — **mock/deferred** (backend M17 not built); show as a placeholder, don't test live.
 
 ---

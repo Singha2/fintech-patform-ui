@@ -89,6 +89,7 @@ docs/
 | S13 | /s13 | Investor portfolio + statements | Investor | ✓ built |
 | S14 | /s14 | Supplier portal | Supplier | ✓ built |
 | S15 | /s15 | Buyer portal | Buyer | ✓ built |
+| S16 | /s16 | Admin & Roles (provision + role assignment) | Super Admin | ✓ built |
 
 ---
 
@@ -96,7 +97,7 @@ docs/
 
 | Persona id | Name | Screens |
 |------------|------|---------|
-| super-admin | Super Admin (Founder) | S1–S8 |
+| super-admin | Super Admin (Founder) | S1–S8, S16 |
 | ops-executive | Ops Executive | S1, S2, S3 |
 | credit-reviewer | Credit Reviewer | S1, S2, S4 |
 | ops-treasury | Ops + Treasury | S1, S2, S3, S5, S6, S7 |
