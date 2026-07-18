@@ -45,6 +45,17 @@ export const PERSONA_ROLES = {
   'buyer':               [],
 }
 
+// Maps backend work-queue NAME (BE-12 /admin/work-queues, counts-only) → target screen (live dashboard).
+export const QUEUE_NAME_SCREEN = {
+  supplier_kyc_review:    '/s3',
+  supplier_credit_review: '/s4',
+  investor_kyc_review:    '/s8',
+  listing_ops_checks:     '/s5',
+  listing_golive_review:  '/s5',
+  disbursement_approval:  '/s6',
+  distribution_approval:  '/s7',
+}
+
 // Maps queue item type → target screen path
 export const QUEUE_SCREEN = {
   supplier_onboarding: '/s3',
@@ -58,10 +69,22 @@ export const QUEUE_SCREEN = {
   user_management:     '/s2',
 }
 
-// Maps S1 persona ids (mockData) → routes.js persona ids
+// Maps S1 persona ids (mockData) → routes.js persona ids. Used by the MOCK login only — leave untouched.
 export const LOGIN_PERSONA_MAP = {
   founder:     'super-admin',
   ops_lead:    'ops-treasury',
   credit_lead: 'credit-reviewer',
   auditor:     'auditor',
+}
+
+// LIVE login: seeded dev-account email → UI persona. Backend role = UI persona, exactly 1:1
+// (canonical mapping: mock docs/API_ALIGNMENT.md §1.4). The other 5 personas are intentionally not live-mapped.
+// Persona is advisory (UI nav/sidebar scope only) — the backend enforces authz from the bearer's real roles.
+export const LIVE_LOGIN_PERSONA_MAP = {
+  'super@dev.local':      'super-admin',
+  'ops@dev.local':        'ops-executive',
+  'credit@dev.local':     'credit-reviewer',
+  'compliance@dev.local': 'compliance-reviewer',
+  'treasury@dev.local':   'treasury-settlement',
+  'treasury2@dev.local':  'treasury-settlement',
 }

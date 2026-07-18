@@ -59,6 +59,10 @@ export function makeSelectors(state) {
     },
     auditEvents:      () => state.auditEvents,                                                    // BE-13 / M17
 
+    // ── live dashboard (BE-12): the hydrated stats object + queue counts (populated by the 'dashboard' loader) ──
+    liveStats:  () => state._stats ?? null,
+    liveQueues: () => state._queues ?? [],
+
     // ── dashboard (live: BE-12; scaffold computes simple counts from the write collections) ──
     dashboardStats: () => ({
       active_listings:  values(state.listings).filter(l => l.status === 'live').length,

@@ -8,7 +8,10 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatDate } from '../../utils/format.js'
+import { investors } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 const STATUS_COLOR = { pending: 'amber', consumed: 'green', expired: 'gray', revoked: 'red' }
 
@@ -21,24 +24,31 @@ function addDays(days) {
 export default function S8() {
   const navigate = useNavigate()
   const { currentPersona } = usePersona()
-  const { listInvites, issueInvite, revokeInvite } = useStore()
+  const { listInvites, revokeInvite } = useStore()   // revokeInvite has no backend endpoint — stays mock (flagged)
+  const live = useHydrate('invites')                   // live mode: fetch GET /investor-invites into the store (BE-9)
   const [form, setForm]       = useState({ email: '', phone: '', justification: '', referrer: '' })
   const [successMsg, setSuccessMsg] = useState('')
+  const [errMsg, setErrMsg]   = useState('')
+  const [busy, setBusy]       = useState(false)
 
   const invites = listInvites()
   const isCompliance = currentPersona.id === 'compliance-reviewer'
 
-  function handleIssue() {
+  async function handleIssue() {
     if (!form.email || !form.phone || !form.justification) return
     const expiry_at = addDays(14)
-    issueInvite({   // 🔗 POST /investor-invites/issue
-      email_display: form.email, phone_display: form.phone, issued_by: currentPersona.name,
-      issued_at: new Date().toISOString(), expiry_at, consumed_at: null,
-      justification: form.justification, referrer: form.referrer,
-    })
-    setSuccessMsg(`Invite sent to ${form.email}. Expires ${formatDate(expiry_at)}.`)
-    setForm({ email: '', phone: '', justification: '', referrer: '' })
-    setTimeout(() => setSuccessMsg(''), 5000)
+    setErrMsg(''); setBusy(true)
+    try {
+      await investors.issueInvite({ email: form.email, phone: form.phone })  // POST /investor-invites/issue (always backend)
+      await live.reload()                                                    // GET /investor-invites (refresh)
+      setSuccessMsg(`Invite sent to ${form.email}. Expires ${formatDate(expiry_at)}.`)
+      setForm({ email: '', phone: '', justification: '', referrer: '' })
+      setTimeout(() => setSuccessMsg(''), 5000)
+    } catch (e) {
+      setErrMsg(describe(e))
+    } finally {
+      setBusy(false)
+    }
   }
 
   const columns = [
@@ -73,6 +83,11 @@ export default function S8() {
           ✓ {successMsg}
         </div>
       )}
+      {errMsg && (
+        <div className="mb-5 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-800">
+          Issue failed: {errMsg}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
         <div className="lg:col-span-1">
@@ -91,8 +106,8 @@ export default function S8() {
               </div>
               <FormField label="Referrer (optional)" id="referrer" placeholder="Name of referring investor"
                 value={form.referrer} onChange={e => setForm(f => ({ ...f, referrer: e.target.value }))} disabled={!isCompliance} />
-              <Button onClick={handleIssue} disabled={!isCompliance || !form.email || !form.phone || !form.justification}>
-                Issue Invite
+              <Button onClick={handleIssue} disabled={busy || !isCompliance || !form.email || !form.phone || !form.justification}>
+                {busy ? 'Issuing…' : 'Issue Invite'}
               </Button>
               {/* TBD: Does platform auto-send invite via email+SMS or does Compliance Reviewer copy/share link? */}
               <p className="text-xs text-gray-400">G9: Invite tied to invitee email + phone at issuance time.</p>
@@ -101,7 +116,8 @@ export default function S8() {
         </div>
 
         <div className="lg:col-span-2">
-          <h2 className="text-sm font-semibold text-gray-700 mb-3">Invite Log (C20)</h2>
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Invite Log (C20){live.loading && <span className="text-xs font-normal text-gray-400"> · loading…</span>}</h2>
+          {live.error && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
           <Table columns={columns} rows={invites} />
         </div>
       </div>

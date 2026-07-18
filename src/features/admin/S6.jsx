@@ -8,7 +8,10 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
+import { settlement } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 // cash_payout_status: drafted|approved|sent|executed|partial|failed|completed
 const STATUS_COLOR = { drafted: 'amber', approved: 'amber', sent: 'amber', executed: 'green', partial: 'amber', failed: 'red', completed: 'green' }
@@ -17,20 +20,29 @@ export default function S6() {
   const navigate = useNavigate()
   const { currentPersona } = usePersona()
   // Store-driven (P4): a fully-funded listing's disbursement is drafted at S12 commit and surfaces here (G-E1).
-  const { disbursementQueue, approveDisbursement } = useStore()
+  const { disbursementQueue } = useStore()
+  const live = useHydrate('disbursements')             // live mode: fetch GET /disbursements into the store (BE-7)
   const [selectedId, setSelectedId] = useState(null)
   const [showMfa, setShowMfa]   = useState(false)
+  const [busy, setBusy]         = useState(false)
+  const [err, setErr]           = useState('')
 
   const disbursements = disbursementQueue()
   const isMaker    = currentPersona.id === 'ops-treasury'
   const isTreasury = currentPersona.id === 'treasury-settlement' || currentPersona.id === 'ops-treasury'
 
-  function handleApprove() { setShowMfa(true) }
+  function handleApprove() { setErr(''); setShowMfa(true) }
 
-  function onMfaConfirm() {
+  // Direct backend command (checker ≠ maker, TREASURY role, MFA). On success advance to S7.
+  async function onMfaConfirm() {
     setShowMfa(false)
-    if (sel) approveDisbursement(sel.listing_id)  // 🔗 POST /listings/{id}/disbursement/approve
-    navigate('/s7')
+    if (!sel) return
+    setBusy(true); setErr('')
+    try {
+      await settlement.disbursementApprove(sel.listing_id)   // POST /listings/{id}/disbursement/approve
+      await live.reload()
+      navigate('/s7')
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 
   const columns = [
@@ -49,6 +61,8 @@ export default function S6() {
     <div>
       {showMfa && <MfaModal action="Approve Disbursement" onConfirm={onMfaConfirm} onCancel={() => setShowMfa(false)} />}
       <PageHeader title="Disbursement Approval Queue" subtitle="Treasury & Settlement — approve fund release to supplier" />
+      {live.error && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-3">Loading disbursements…</p>}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         <div className={sel ? 'lg:col-span-2' : 'lg:col-span-5'}>
@@ -92,10 +106,11 @@ export default function S6() {
                 )}
                 <Button
                   onClick={handleApprove}
-                  disabled={!sel.all_signed || isMaker || !isTreasury}
+                  disabled={busy || !sel.all_signed || isMaker || !isTreasury}
                 >
-                  Approve Disbursement (MFA required — C7)
+                  {busy ? 'Approving…' : 'Approve Disbursement (MFA required — C7)'}
                 </Button>
+                {err && <p className="text-xs text-red-600 mt-2">Approve failed: {err}</p>}
                 {!isTreasury && !isMaker && <p className="text-xs text-gray-400 mt-2">Switch to Treasury & Settlement persona to approve.</p>}
                 <p className="text-xs text-gray-400 mt-2">VA reference: {sel.listing_id} · DL-043 (per-listing VA)</p>
               </Card>

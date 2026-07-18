@@ -6,6 +6,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import { formatPaise, formatRate, formatDate, fundingPct } from '../../utils/format.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 const VARIANTS = [
   { id: 'normal',             label: 'Normal' },
@@ -63,6 +64,7 @@ function ListingCard({ listing, onClick, disabled }) {
 export default function S11() {
   const navigate = useNavigate()
   const { marketplaceListings } = useStore()
+  const live = useHydrate('marketplace')               // live mode: fetch GET /listings?status=live into the store (BE-14)
   const [variant, setVariant] = useState('normal')
   // Live + fully-funded listings from the shared store — so a go-live approved on S5 shows up here (G-D3).
   const listings = marketplaceListings()
@@ -70,6 +72,8 @@ export default function S11() {
   return (
     <div>
       <PageHeader title="Listing Marketplace" subtitle="Browse live invoice listings available for investment" />
+      {live.error && <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-4">Loading listings…</p>}
 
       <div className="flex items-center gap-2 flex-wrap mb-6">
         <span className="text-xs text-gray-400">Preview state:</span>

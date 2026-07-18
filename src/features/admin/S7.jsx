@@ -7,6 +7,8 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate, formatDatetime } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { settlement as settlementSvc, distributionTax as distributionTaxSvc } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
 
 const REC_COLOR = { matched: 'green', partial: 'amber', unmatched: 'red' }
@@ -15,15 +17,33 @@ export default function S7() {
   const navigate = useNavigate()
   // Store-driven (P4): distributions drafted on disbursement (S6); maturity + execution close the deal and land
   // the payout on the investor's S13 portfolio (G-E4). Reconciliation stays local (G6 — no read endpoint).
-  const { distributionsList, recordMaturity, executeDistribution } = useStore()
+  const { distributionsList } = useStore()
   const [tab, setTab]       = useState('distributions')
   const [selectedId, setSelectedId] = useState(null)
   const [recon, setRecon] = useState(mockData.S7.reconciliation)
+  const [busy, setBusy]   = useState(false)
+  const [err, setErr]     = useState('')
 
   const distributions = distributionsList()
 
   function raiseShortfall(recId) {
     setRecon(prev => prev.map(r => (r.rec_id === recId ? { ...r, status: 'shortfall_raised' } : r)))
+  }
+
+  // 🔗 POST /listings/{id}/record-maturity {amount_paise, utr} (TREASURY).
+  async function recordMaturity(listingId, amountPaise) {
+    setErr(''); setBusy(true)
+    try { await settlementSvc.recordMaturity(listingId, { amount_paise: amountPaise, utr: `UTR${Date.now()}` }) }
+    catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+  }
+  // 🔗 distribution/draft (maker) → distribution/approve (checker ≠ maker). Needs TWO treasury users — a same-user
+  // approve is rejected (checker = maker), so a full run means re-logging as the second treasury account.
+  async function executeDistribution(listingId) {
+    setErr(''); setBusy(true)
+    try {
+      await distributionTaxSvc.distributionDraft(listingId)
+      await distributionTaxSvc.distributionApprove(listingId)
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 
   const distColumns = [
@@ -117,14 +137,15 @@ export default function S7() {
                   <div className="mt-4 flex items-center gap-2"><StatusBadge label="All Distributions Executed" color="green" /></div>
                 ) : !selDist.matured ? (
                   <div className="mt-4">
-                    <Button onClick={() => recordMaturity(selDist.listing_id, { amount_paise: selDist.buyer_payment_amount_paise })}>Record Maturity (buyer repayment)</Button>
+                    <Button disabled={busy} onClick={() => recordMaturity(selDist.listing_id, selDist.buyer_payment_amount_paise)}>{busy ? 'Recording…' : 'Record Maturity (buyer repayment)'}</Button>
                     <p className="text-xs text-gray-400 mt-2">C23: buyer repayment must be recorded before distribution executes.</p>
                   </div>
                 ) : (
-                  <Button className="mt-4" onClick={() => executeDistribution(selDist.listing_id)}>
-                    Execute Distributions (T+1 · DL-030)
+                  <Button className="mt-4" disabled={busy} onClick={() => executeDistribution(selDist.listing_id)}>
+                    {busy ? 'Executing…' : 'Execute Distributions (T+1 · DL-030)'}
                   </Button>
                 )}
+                {err && <p className="text-xs text-red-600 mt-3">Failed: {err}</p>}
               </Card>
             </div>
           )}

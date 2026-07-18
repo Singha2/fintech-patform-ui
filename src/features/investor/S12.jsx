@@ -7,7 +7,10 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import { formatPaise, formatRupees, formatRate, formatDate, formatDatetime, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { subscriptions as subscriptionsSvc } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 const VARIANTS = [
   { id: 'not_subscribed',          label: 'Not Subscribed' },
@@ -28,12 +31,13 @@ const INVESTOR = { id: 'inv-acct-001', name: 'Rahul Mehta' }
 export default function S12() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { listingDetail, commitSubscription } = useStore()
+  const { listingDetail } = useStore()
 
   // Resolve the clicked listing from the shared store (closes G-C3); fall back to the seeded sample for the
   // demo listing and to fill fields a store-created listing may not carry (nested parties, VA, snapshot).
   const sample = mockData.S12
   const listingId = location.state?.listingId ?? sample.listing.listing_id
+  const live = useHydrate(['listingDetail', listingId], [listingId])  // live: GET /listings/{id}/detail + ops-checks (BE-10)
   const detail = listingDetail(listingId)
   const listing = detail?.listing ?? sample.listing
   const invoice = detail?.invoice ?? sample.invoice
@@ -69,14 +73,19 @@ export default function S12() {
   const netReturn = grossReturn - tdsAmt
   const pct = fundingPct(committedTotal, fundingTarget)
 
-  function handleCommit() {
+  // 🔗 POST /listings/{id}/subscriptions/commit {investor_id, amount_paise} — ops-on-behalf (OPS role; investor
+  // self-commit is BE-18). NOTE for live: investor_id must be a REAL backend id — INVESTOR.id is the mock
+  // placeholder (ties to the deferred investor-login + the dev seed helper, which returns a real investor_id).
+  async function handleCommit() {
     if (amtNum < 10000) { setAmountErr('Minimum investment is ₹10,000 (DL-007).'); return }
     if (committedTotal + amtNum * 100 > fundingTarget) { setAmountErr('Amount exceeds remaining headroom (G10/L.2).'); return }
     setAmountErr('')
-    // 🔗 POST /listings/{id}/subscriptions/commit — writes to the store so S6 (disbursement) + S13 (portfolio) see it.
-    const subId = commitSubscription(listingId, { investor_id: INVESTOR.id, investor_name: INVESTOR.name, amount_paise: amtNum * 100 })
-    setSubscription({ subscription_id: subId ?? 'sub-new', amount: amtNum * 100, status: 'committed' })
-    setVariant('committed')
+    try {
+      const env = await subscriptionsSvc.commit(listingId, { investor_id: INVESTOR.id, amount_paise: amtNum * 100 })
+      await live.reload()
+      setSubscription({ subscription_id: env?.aggregate_id ?? 'sub-new', amount: amtNum * 100, status: 'committed' })
+      setVariant('committed')
+    } catch (e) { setAmountErr(describe(e)) }
   }
 
   function handleCopy() {
@@ -96,6 +105,8 @@ export default function S12() {
         title={buyer.name ?? listing.listing_id}
         subtitle={`Listing ${listing.listing_id} · ${buyer.sector ?? ''}`}
       />
+      {live.error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-4">Loading listing…</p>}
 
       {/* State variant switcher */}
       <div className="flex items-center gap-2 flex-wrap mb-6">

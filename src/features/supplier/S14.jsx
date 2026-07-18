@@ -9,6 +9,7 @@ import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 const VARIANTS = [
   { id: 'normal',                  label: 'Normal' },
@@ -35,6 +36,7 @@ export default function S14() {
 
   // The supplier whose portal this is — passed from S3 "Open Supplier Portal →" (falls back to the seeded one).
   const supplierId = location.state?.supplierId ?? mockData.S14.supplier.supplier_id
+  const live = useHydrate(['supplierListings', supplierId], [supplierId])  // live: GET /suppliers/{id}/listings (BE-11)
   const supplier = getSupplier(supplierId) ?? mockData.S14.supplier
   const invoices = supplierInvoices(supplierId)
   const consentOff = variant === 'agency_consent_inactive'
@@ -92,6 +94,8 @@ export default function S14() {
       </div>
 
       <PageHeader title="Supplier Portal" subtitle={`${supplier.legal_name} · ${supplier.pan} · ${supplier.gstin}`} />
+      {live.error && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-4">Loading invoices…</p>}
 
       <div className="flex items-center gap-2 flex-wrap mb-5">
         <span className="text-xs text-gray-400">Preview:</span>

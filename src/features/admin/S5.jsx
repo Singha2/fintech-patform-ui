@@ -8,7 +8,10 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
+import { listings as listingsSvc } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 import { DEFAULT_CHECKS } from '../../store/operations.js'
 
 // Keys are the canonical ops-check `check_name` wire values (POST /listings/{id}/record-ops-check).
@@ -25,11 +28,43 @@ export default function S5() {
   const navigate = useNavigate()
   const { currentPersona } = usePersona()
   // Store-driven (P3): invoices flow in from S14, listings created here surface on S11 → S12.
-  const { opsInvoices, getInvoice, recordOpsCheck, createListing, listListings, approveGoLive } = useStore()
+  const { opsInvoices, getInvoice, listListings } = useStore()
   const [tab, setTab]             = useState('checks')
   const [selectedId, setSelectedId] = useState(null)
   const [showMfa, setShowMfa]     = useState(false)
   const [pendingListingId, setPendingListingId] = useState(null)
+  const [busy, setBusy]           = useState(false)
+  const [err, setErr]             = useState('')
+
+  // Live: GET /listings → the ops queue (invoices) + approval list (listings) (BE-6); + the selected invoice's
+  // ops-checks on open (two-level fetch). No-op in mock mode.
+  const live = useHydrate('opsListings')
+  const checkLive = useHydrate(['opsChecks', selectedId], [selectedId])
+
+  // Record one ops-check — a direct backend command (the mock "invoice" IS the backend listing). Ensures
+  // ops-checks are started (draft → operational_checks_in_progress), threads the version, then refreshes the
+  // check grid + the list. buyer_ack is a separate command (record-buyer-ack).
+  async function recordCheck(listingId, checkName, uiOutcome) {
+    setErr(''); setBusy(true)
+    try {
+      let cur = await listingsSvc.get(listingId)
+      if (cur.status === 'draft') { await listingsSvc.startOpsChecks(listingId, cur.aggregate_version); cur = await listingsSvc.get(listingId) }
+      if (checkName === 'buyer_ack') {
+        await listingsSvc.recordBuyerAck(listingId, { outcome: uiOutcome === 'fail' ? 'declined' : 'acknowledged' }, cur.aggregate_version)
+      } else {
+        await listingsSvc.recordOpsCheck(listingId, { check_name: checkName, outcome: uiOutcome === 'fail' ? 'failed' : 'passed' }, cur.aggregate_version)
+      }
+      await checkLive.reload(); await live.reload()
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+  }
+  async function sendAckRequest(listingId) {
+    setErr(''); setBusy(true)
+    try {
+      const cur = await listingsSvc.get(listingId)
+      await listingsSvc.requestBuyerAck(listingId, { sla_hours: 48 }, cur.aggregate_version)
+      await checkLive.reload()
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+  }
 
   // Maker-checker: ops-treasury persona is the maker
   const isMaker = currentPersona.id === 'ops-treasury'
@@ -45,24 +80,38 @@ export default function S5() {
     return vals.length > 0 && vals.every(o => o.outcome === 'pass')
   }
 
-  // Promote a fully-checked invoice into the maker-checker approval list. 🔗 POST /listings + snapshot-and-ready
-  function promoteToListing(inv) {
-    if (!allChecksPassed(inv.invoice_id)) return
-    createListing(inv.invoice_id)
-    setSelectedId(null)
-    setTab('approval')
+  // Promote a fully-checked invoice into the approval list — the backend sequence to ready_for_review:
+  // complete-ops-checks → (request + record buyer-ack) → snapshot-and-ready {rate_bps}. All OPS, version threaded.
+  const VERS = async (id) => (await listingsSvc.get(id)).aggregate_version
+  async function promoteToListing(inv) {
+    const listingId = inv.invoice_id
+    setErr(''); setBusy(true)
+    try {
+      await listingsSvc.completeOpsChecks(listingId, await VERS(listingId))
+      await listingsSvc.requestBuyerAck(listingId, { sla_hours: 48 }, await VERS(listingId))
+      await listingsSvc.recordBuyerAck(listingId, { outcome: 'acknowledged' }, await VERS(listingId))
+      await listingsSvc.snapshotAndReady(listingId, { rate_bps: 1200 }, await VERS(listingId))
+      await live.reload()
+      setSelectedId(null); setTab('approval')
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 
   function handleGoLive(listingId) {
-    setPendingListingId(listingId)
-    setShowMfa(true)
+    setErr(''); setPendingListingId(listingId); setShowMfa(true)
   }
 
-  function onMfaConfirm() {
+  // Go-live approval — TREASURY, checker ≠ the maker who ran snapshot-and-ready. 🔗 approve-go-live → live (S11).
+  async function onMfaConfirm() {
     setShowMfa(false)
-    if (pendingListingId) approveGoLive(pendingListingId)  // 🔗 POST /listings/{id}/approve-go-live → live in S11
+    const listingId = pendingListingId
     setPendingListingId(null)
-    navigate('/s6')
+    if (!listingId) return
+    setBusy(true); setErr('')
+    try {
+      await listingsSvc.approveGoLive(listingId, await VERS(listingId))
+      await live.reload()
+      navigate('/s6')
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 
   const invColumns = [
@@ -89,6 +138,8 @@ export default function S5() {
     <div>
       {showMfa && <MfaModal action="Approve Listing Go-Live" onConfirm={onMfaConfirm} onCancel={() => { setShowMfa(false); setPendingListingId(null) }} />}
       <PageHeader title="Invoice Checks + Listing Approval" subtitle="Ops Executive (checks) · Treasury & Settlement (go-live approval)" />
+      {live.error && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-3">Loading invoices…</p>}
 
       {/* Tabs */}
       <div className="flex gap-1 border-b border-gray-200 mb-5">
@@ -134,20 +185,22 @@ export default function S5() {
                     <StatusBadge label={val.outcome} color={OUTCOME_COLOR[val.outcome] ?? 'gray'} />
                     {val.outcome === 'pending' && (
                       <div className="flex gap-1 ml-2">
-                        <Button className="text-xs py-0.5 px-2" onClick={() => recordOpsCheck(selectedInv.invoice_id, key, 'pass')}>Pass</Button>
-                        <Button variant="ghost" className="text-xs py-0.5 px-2 text-red-600" onClick={() => recordOpsCheck(selectedInv.invoice_id, key, 'fail')}>Fail</Button>
+                        <Button className="text-xs py-0.5 px-2" disabled={busy} onClick={() => recordCheck(selectedInv.invoice_id, key, 'pass')}>Pass</Button>
+                        <Button variant="ghost" className="text-xs py-0.5 px-2 text-red-600" disabled={busy} onClick={() => recordCheck(selectedInv.invoice_id, key, 'fail')}>Fail</Button>
                       </div>
                     )}
                   </div>
                 ))}
               </div>
 
+              {err && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Check failed: {err}</div>}
+
               <div className="flex gap-3">
-                <Button variant="ghost" onClick={() => recordOpsCheck(selectedInv.invoice_id, 'buyer_ack', 'pending')}>Send Ack Request</Button>
-                <Button variant="ghost" onClick={() => recordOpsCheck(selectedInv.invoice_id, 'buyer_ack', 'pass')}>Capture Manual Ack</Button>
+                <Button variant="ghost" disabled={busy} onClick={() => sendAckRequest(selectedInv.invoice_id)}>Send Ack Request</Button>
+                <Button variant="ghost" disabled={busy} onClick={() => recordCheck(selectedInv.invoice_id, 'buyer_ack', 'pass')}>Capture Manual Ack</Button>
               </div>
-              <Button disabled={!allChecksPassed(selectedInv.invoice_id)} onClick={() => promoteToListing(selectedInv)}>
-                Send to Listing Approval →
+              <Button disabled={busy || !allChecksPassed(selectedInv.invoice_id)} onClick={() => promoteToListing(selectedInv)}>
+                {busy ? 'Promoting…' : 'Send to Listing Approval →'}
               </Button>
               {!allChecksPassed(selectedInv.invoice_id) && <p className="text-xs text-gray-400">All checks must pass before the listing can be priced and sent for go-live approval.</p>}
             </div>
@@ -158,6 +211,7 @@ export default function S5() {
       {/* ── Tab: Listing Approval ── */}
       {tab === 'approval' && (
         <div>
+          {err && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Failed: {err}</div>}
           {listings.length === 0
             ? <Card><p className="text-sm text-gray-500 py-6 text-center">No listings awaiting go-live. Pass all checks on an invoice and send it here.</p></Card>
             : <Table columns={listColumns} rows={listings} />}
@@ -176,11 +230,11 @@ export default function S5() {
                     <p className="text-xs text-red-600 font-medium">⛔ Maker-checker violation: you cannot approve your own listing (C4).</p>
                   )}
                   <Button
-                    disabled={isMaker || !isTreasury}
+                    disabled={busy || isMaker || !isTreasury}
                     onClick={() => handleGoLive(lst.listing_id)}
                     title={isMaker ? 'Cannot approve as maker' : !isTreasury ? 'Treasury & Settlement role required' : ''}
                   >
-                    Approve Go-Live (C7 — MFA required)
+                    {busy ? 'Approving…' : 'Approve Go-Live (C7 — MFA required)'}
                   </Button>
                   {!isTreasury && !isMaker && <p className="text-xs text-gray-400">Switch to Treasury & Settlement persona to approve.</p>}
                 </div>

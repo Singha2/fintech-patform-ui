@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import { PERSONAS, SCREENS, LOGIN_PERSONA_MAP } from './routes.js'
 import { PlatformStoreProvider } from './store/PlatformStore.jsx'
+import { AuthProvider } from './context/AuthContext.jsx'
 import { PersonaProvider, usePersona } from './context/PersonaContext.jsx'
 import Layout from './components/layout/Layout.jsx'
 import S1  from './features/admin/S1.jsx'
@@ -33,8 +34,12 @@ function AppRoutes() {
     if (first) navigate(first.path)
   }
 
-  function handleLogin(s1PersonaId) {
-    const routesPersonaId = LOGIN_PERSONA_MAP[s1PersonaId] ?? 'ops-executive'
+  function handleLogin(personaId) {
+    // Accepts either a routes persona id directly (live login, derived from the dev-account email) or a mock
+    // S1 login id (founder/ops_lead/…) which maps through LOGIN_PERSONA_MAP.
+    const routesPersonaId = PERSONAS.some(p => p.id === personaId)
+      ? personaId
+      : (LOGIN_PERSONA_MAP[personaId] ?? 'ops-executive')
     setPersonaById(routesPersonaId)
     navigate(routesPersonaId === 'auditor' ? '/s9' : '/s2')
   }
@@ -63,9 +68,11 @@ function AppRoutes() {
 export default function App() {
   return (
     <PlatformStoreProvider>
-      <PersonaProvider>
-        <AppRoutes />
-      </PersonaProvider>
+      <AuthProvider>
+        <PersonaProvider>
+          <AppRoutes />
+        </PersonaProvider>
+      </AuthProvider>
     </PlatformStoreProvider>
   )
 }

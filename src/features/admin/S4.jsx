@@ -8,7 +8,10 @@ import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
+import { buyers as buyersSvc } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { useHydrate } from '../../store/useHydrate.js'
 
 // buyer_account_status lifecycle (backend): nominated → identity_verified → credit_assessed → engagement_started → active
 const STATUS_COLOR = { nominated: 'gray', identity_verified: 'amber', credit_assessed: 'amber', engagement_started: 'amber', active: 'green', suspended: 'red' }
@@ -23,14 +26,47 @@ const STAGE_ACTIONS = {
 
 export default function S4() {
   const navigate = useNavigate()
-  const { listBuyers, getBuyer, advanceBuyer, setBuyerCredit } = useStore()
+  const { listBuyers, getBuyer } = useStore()
+  const live = useHydrate('buyers')                    // live mode: fetch GET /buyers into the store (BE-5)
   const [selected, setSelected]     = useState(null)
   const [fourEyes, setFourEyes]     = useState(false)
   const [limitInput, setLimitInput] = useState('')
   const [savedMsg, setSavedMsg]     = useState('')
+  const [errMsg, setErrMsg]         = useState('')
+  const [busy, setBusy]             = useState(false)
   const [approver, setApprover] = useState('')
+  const [nominating, setNominating] = useState(false)
+  const [nomForm, setNomForm] = useState({ legal_name: '', mca_cin: '', gstin: '', sector: '' })
+  const [ackForm, setAckForm] = useState({ email: '', phone: '', display_name: '' })
 
   const buyers = listBuyers()
+  const freshVer = async (id) => (await buyersSvc.get(id)).aggregate_version   // list read omits version; read it per command
+
+  // Activation (OPS) is a 3-command sub-chain: designate-ack-user → confirm-payment-instruction → activate.
+  // BA.3: activation requires an active acknowledgment user, so it can't be a single transition.
+  async function completeActivation() {
+    const id = selected.buyer_id
+    if (!ackForm.email || !ackForm.phone || !ackForm.display_name) { setErrMsg('Enter ack-user email, phone, and name'); return }
+    setSavedMsg(''); setErrMsg(''); setBusy(true)
+    try {
+      await buyersSvc.designateAckUser(id, { ...ackForm }, await freshVer(id))
+      await buyersSvc.confirmPaymentInstruction(id, await freshVer(id))
+      await buyersSvc.activate(id, await freshVer(id))
+      await live.reload()
+      setSavedMsg('Buyer activated.')
+    } catch (e) { setErrMsg(describe(e)) } finally { setBusy(false) }
+  }
+
+  // Start the chain: POST /buyers/nominate (CREDIT role) → refresh the list.
+  async function nominateBuyer() {
+    setSavedMsg(''); setErrMsg(''); setBusy(true)
+    try {
+      await buyersSvc.nominate({ legal_name: nomForm.legal_name, mca_cin: nomForm.mca_cin, gstin: nomForm.gstin, sector: nomForm.sector })
+      await live.reload()
+      setNominating(false); setNomForm({ legal_name: '', mca_cin: '', gstin: '', sector: '' })
+      setSavedMsg('Buyer nominated.')
+    } catch (e) { setErrMsg(describe(e)) } finally { setBusy(false) }
+  }
 
   function openBuyer(row) {
     setSelected(row)
@@ -38,19 +74,46 @@ export default function S4() {
     setSavedMsg('')
   }
 
-  function saveCreditLimit() {
+  // Direct backend transition (no in-memory fallback). record-credit-assessment carries the limit and advances
+  // the buyer's state → it needs the current aggregate_version (the list read BE-5 omits it, so read it fresh).
+  async function saveCreditLimit() {
     const paise = Math.round(Number(limitInput) * 100)
-    if (!Number.isFinite(paise) || paise <= 0) { setSavedMsg('Enter a valid amount'); return }
-    setBuyerCredit(selected.buyer_id, paise)   // 🔗 POST /credit/buyers/{id}/profile
-    setSavedMsg(`Credit limit set to ${formatPaise(paise)} (mock)`)
+    if (!Number.isFinite(paise) || paise <= 0) { setErrMsg('Enter a valid amount'); return }
+    setSavedMsg(''); setErrMsg(''); setBusy(true)
+    try {
+      const { aggregate_version } = await buyersSvc.get(selected.buyer_id)                                 // GET current version
+      await buyersSvc.recordCreditAssessment(selected.buyer_id, { credit_limit_paise: paise }, aggregate_version) // POST + X-Aggregate-Version
+      await live.reload()                                                                                  // GET /buyers (refresh)
+      setSavedMsg(`Credit limit set to ${formatPaise(paise)}.`)
+    } catch (e) {
+      setErrMsg(describe(e))
+    } finally {
+      setBusy(false)
+    }
   }
   const pricingBands = selected
     ? mockData.S4.pricing_bands.filter(pb => pb.buyer_id === selected.buyer_id)
     : []
 
-  function advanceStatus(buyer) {
-    const action = STAGE_ACTIONS[buyer.status]
-    if (action) advanceBuyer(buyer.buyer_id, action.next)   // 🔗 the buyer transition chain
+  // The buyer transition chain — each step is a direct backend command with the current aggregate_version.
+  // Roles differ per step (SoD): identity-verified/start-engagement/activate = OPS, credit-assessment = CREDIT;
+  // a step you lack the role for returns 403 (shown inline) — re-login as the right dev account to proceed.
+  async function advanceStatus() {
+    const id = selected.buyer_id
+    setSavedMsg(''); setErrMsg(''); setBusy(true)
+    try {
+      const { aggregate_version: v } = await buyersSvc.get(id)                       // fresh version per step
+      if (currentStatus === 'nominated')            await buyersSvc.recordIdentityVerified(id, v)
+      else if (currentStatus === 'identity_verified') {
+        const paise = Math.round(Number(limitInput) * 100)
+        if (!Number.isFinite(paise) || paise <= 0) throw new Error('Enter a credit limit in the Credit Profile card first')
+        await buyersSvc.recordCreditAssessment(id, { credit_limit_paise: paise }, v)
+      }
+      else if (currentStatus === 'credit_assessed')    await buyersSvc.startEngagement(id, v)
+      else if (currentStatus === 'engagement_started') await buyersSvc.activate(id, v)
+      await live.reload()
+      setSavedMsg(`${stageAction.label} done.`)
+    } catch (e) { setErrMsg(describe(e)) } finally { setBusy(false) }
   }
 
   const listColumns = [
@@ -78,6 +141,9 @@ export default function S4() {
     <div>
       <PageHeader title="Buyer Management" subtitle="Credit review and limit setting — Credit Reviewer" />
 
+      {live.error && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700">Live load failed: {live.error}</div>}
+      {live.loading && <p className="text-xs text-gray-400 mb-3">Loading buyers…</p>}
+
       {/* Four-eyes demo toggle */}
       <div className="flex items-center gap-2 mb-4">
         <label className="flex items-center gap-2 text-xs text-gray-500 cursor-pointer">
@@ -85,6 +151,28 @@ export default function S4() {
           Preview: Four-eyes required (DL-023/C6)
         </label>
       </div>
+
+      {/* Nominate a new buyer (starts the onboarding chain) */}
+      {!selected && (
+        <div className="mb-4">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-sm font-semibold text-gray-700">Buyers</h2>
+            <Button className="text-xs py-1.5 px-4" onClick={() => setNominating(n => !n)}>{nominating ? 'Cancel' : '+ Nominate Buyer'}</Button>
+          </div>
+          {nominating && (
+            <Card className="mb-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label="Legal Name" id="nm_ln" value={nomForm.legal_name} onChange={e => setNomForm(f => ({ ...f, legal_name: e.target.value }))} />
+                <FormField label="Sector" id="nm_sec" value={nomForm.sector} onChange={e => setNomForm(f => ({ ...f, sector: e.target.value }))} placeholder="e.g. Manufacturing" />
+                <FormField label="MCA CIN" id="nm_cin" value={nomForm.mca_cin} onChange={e => setNomForm(f => ({ ...f, mca_cin: e.target.value }))} placeholder="L17110MH1973PLC019786" />
+                <FormField label="GSTIN" id="nm_gst" value={nomForm.gstin} onChange={e => setNomForm(f => ({ ...f, gstin: e.target.value }))} placeholder="27AAACR5055K1ZT" />
+              </div>
+              <Button className="mt-3" disabled={busy || !nomForm.legal_name || !nomForm.mca_cin || !nomForm.gstin || !nomForm.sector} onClick={nominateBuyer}>{busy ? 'Nominating…' : 'Nominate (CREDIT role)'}</Button>
+              {errMsg && <p className="text-xs text-red-600 mt-2">Nominate failed: {errMsg}</p>}
+            </Card>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
         {/* Buyer list */}
@@ -133,8 +221,9 @@ export default function S4() {
                   </div>
                 )}
 
-                <Button disabled={isFourEyes && !approver} onClick={saveCreditLimit}>Set / Update Credit Limit</Button>
+                <Button disabled={busy || (isFourEyes && !approver)} onClick={saveCreditLimit}>{busy ? 'Saving…' : 'Set / Update Credit Limit'}</Button>
                 {savedMsg && <p className="text-xs text-green-600">{savedMsg}</p>}
+                {errMsg && <p className="text-xs text-red-600">Save failed: {errMsg}</p>}
                 <p className="text-xs text-gray-400">G20: Credit limit changes don't affect in-flight listings.</p>
 
                 {pricingBands.length > 0 && (
@@ -146,13 +235,29 @@ export default function S4() {
               </div>
             </Card>
 
-            {/* Stage action */}
-            {stageAction && (
+            {/* Stage action (single transition) */}
+            {stageAction && currentStatus !== 'engagement_started' && (
               <Card title="Onboarding Action">
                 <div className="flex items-center gap-3">
                   <StatusBadge label={currentStatus.replace(/_/g, ' ')} color={STATUS_COLOR[currentStatus] ?? 'gray'} />
-                  <Button onClick={() => advanceStatus({ ...selected, status: currentStatus })}>{stageAction.label}</Button>
+                  <Button disabled={busy} onClick={advanceStatus}>{busy ? 'Working…' : stageAction.label}</Button>
                 </div>
+                {errMsg && <p className="text-xs text-red-600 mt-2">Failed: {errMsg}</p>}
+                {savedMsg && <p className="text-xs text-green-600 mt-2">{savedMsg}</p>}
+              </Card>
+            )}
+
+            {/* Activation (engagement_started) — needs an ack-user first (BA.3), so it's a 3-command sub-chain */}
+            {currentStatus === 'engagement_started' && (
+              <Card title="Activate Buyer — designate an acknowledgment user (BA.3)">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-3">
+                  <FormField label="Ack-User Email" id="ack_e" value={ackForm.email} onChange={e => setAckForm(f => ({ ...f, email: e.target.value }))} />
+                  <FormField label="Phone" id="ack_p" value={ackForm.phone} onChange={e => setAckForm(f => ({ ...f, phone: e.target.value }))} placeholder="+919000012345" />
+                  <FormField label="Name" id="ack_n" value={ackForm.display_name} onChange={e => setAckForm(f => ({ ...f, display_name: e.target.value }))} />
+                </div>
+                <Button disabled={busy} onClick={completeActivation}>{busy ? 'Activating…' : 'Designate Ack-User, Confirm PI & Activate (OPS)'}</Button>
+                {errMsg && <p className="text-xs text-red-600 mt-2">Failed: {errMsg}</p>}
+                {savedMsg && <p className="text-xs text-green-600 mt-2">{savedMsg}</p>}
               </Card>
             )}
             {currentStatus === 'active' && (
