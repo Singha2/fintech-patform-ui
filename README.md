@@ -43,8 +43,8 @@ From a terminal:
 
 ```bash
 # 1. Clone the repository (skip if you already have it)
-git clone https://github.com/Singha2/fintech-patform-mock.git
-cd fintech-patform-mock
+git clone https://github.com/Singha2/fintech-patform-ui.git
+cd fintech-patform-ui
 
 # 2. Install dependencies (creates node_modules/)
 npm install
@@ -88,7 +88,7 @@ You can also jump directly to any screen by typing its route in the URL bar, e.g
 ## Project structure
 
 ```
-fintech-patform-mock/
+fintech-patform-ui/
 ├── index.html            # HTML entry point (Vite injects the bundle here)
 ├── package.json          # Dependencies + npm scripts
 ├── vite.config.js        # Vite + React plugin config

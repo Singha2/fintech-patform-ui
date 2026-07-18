@@ -17,7 +17,7 @@ Dev **admins** log in with password **`DevPass123!`**; the **investor** and **bu
    Wait for `Started ... Application`.
 2. **UI — must be live mode** (default is offline mock; skip `VITE_DATA_MODE=live` and you're NOT hitting the backend):
    ```
-   cd fintech-patform-mock && npm install && VITE_DATA_MODE=live npm run dev
+   cd fintech-patform-ui && npm install && VITE_DATA_MODE=live npm run dev
    ```
    Open http://localhost:5173.
 3. **Sanity:** `curl -s localhost:8080/api/v1/dev/seed-info` returns ids → you're good.

@@ -5,7 +5,7 @@
 > tracker points to — do the steps here, but record *progress* (which screen is wired) in the tracker.
 
 > **Audience: a Claude Code session.** This document is the build plan for wiring the React UI
-> (`fintech-patform-mock`) to the live Spring Boot backend (`fintech-platform-backend`, served under
+> (`fintech-patform-ui`) to the live Spring Boot backend (`fintech-platform-backend`, served under
 > `/api/v1`). It is organised into **phases → numbered steps**. Each step is independently reviewable and
 > testable and states its own **Files**, **Do**, **Backend contract**, **Test**, and **Acceptance**.
 >
