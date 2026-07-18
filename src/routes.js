@@ -32,13 +32,16 @@ export const PERSONAS = [
 export const SIDEBAR_GROUPS = ['Admin', 'Auditor', 'Investor', 'Supplier', 'Buyer']
 
 // Live mode: the screens a session may reach, derived directly from the backend's roles[]/kind — no persona.
-// Inclusive by design (a screen a role partly acts on is shown; the backend enforces the real per-action authz,
-// so a step you lack the role for still 403s inline). Edit this table to change who sees what.
+// TIGHT / primary-ownership mapping — each role sees only the screens it primarily owns (S2 dashboard is every
+// admin's home; S5 is genuinely Ops+Treasury). The backend still enforces per-action authz, so any step is
+// 403-gated regardless of nav. NOTE: some SoD steps live on another role's screen (e.g. compliance approves KYC
+// on S3, ops records maturity on S7) — those screens are NOT in that role's sidebar under this tight mapping.
+// Widen any row here if a role needs to reach a shared screen.
 const ROLE_SCREENS = {
   super_admin:             ['S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S10', 'S14'],
-  ops_executive:           ['S2', 'S3', 'S4', 'S5', 'S7', 'S10', 'S14'],
-  credit_reviewer:         ['S2', 'S3', 'S4'],
-  compliance_reviewer:     ['S2', 'S3', 'S8', 'S10'],
+  ops_executive:           ['S2', 'S3', 'S5', 'S10', 'S14'],
+  credit_reviewer:         ['S2', 'S4'],
+  compliance_reviewer:     ['S2', 'S8'],
   treasury_and_settlement: ['S2', 'S5', 'S6', 'S7'],
   auditor:                 ['S9'],
 }
