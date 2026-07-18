@@ -47,18 +47,36 @@ So after a command the UI must **re-read** (`GET …/{id}`) to refresh display s
   "correlation_id": "…", "retryable": false }
 ```
 
-### 1.4 Roles = personas
-Backend admin roles map 1:1 to the mock's admin personas. `auditor` in the mock has **no backend role yet**
-(no audit query endpoint exists — see gaps).
+### 1.4 Roles = personas (canonical live-login mapping)
 
-| Mock persona | Backend `admin_role` |
-|---|---|
-| super-admin | `super_admin` |
-| ops-executive | `ops_executive` |
-| credit-reviewer | `credit_reviewer` |
-| ops-treasury / treasury-settlement | `treasury_and_settlement` (+ `ops_executive`) |
-| compliance-reviewer | `compliance_reviewer` |
-| auditor | — (no endpoint) |
+Live login derives the UI persona from the authenticated identity's **single** backend `admin_role` (each
+seeded dev admin holds exactly one). These five personas map **1:1** to a backend role — identical meaning, only
+hyphen-vs-underscore formatting differs — so live login is an exact, unambiguous translation:
+
+| Backend `admin_role` | UI persona (id) | Dev account(s) |
+|---|---|---|
+| `super_admin` | `super-admin` | `super@dev.local` |
+| `ops_executive` | `ops-executive` | `ops@dev.local` |
+| `credit_reviewer` | `credit-reviewer` | `credit@dev.local` |
+| `compliance_reviewer` | `compliance-reviewer` | `compliance@dev.local` |
+| `treasury_and_settlement` | `treasury-settlement` | `treasury@dev.local`, `treasury2@dev.local` |
+
+(`treasury2@dev.local` exists so the disbursement/distribution **maker ≠ checker** pair can be exercised with two
+real logins.)
+
+**The other 5 UI personas are NOT live-mapped in the current bridge phase — documented here, revisit later:**
+
+| UI persona | Why it isn't a 1:1 live login | Revisit when |
+|---|---|---|
+| `ops-treasury` | **Composite** (`ops_executive` + `treasury_and_settlement`) — no single backend role/account holds both. A **mock-only** single-actor shortcut for the golden-path walk. Live, the same steps split across `ops@` (checks) and `treasury@`/`treasury2@` (go-live/disburse) — the real maker-checker separation. | Never for live (the split *is* the correct behaviour). Stays mock-only. |
+| `auditor` | `auditor` is a real `admin_role`, but **no auditor dev account is seeded** and the audit-read API is deferred (M17 / BE-13). | M17 audit-read ships **and** an auditor dev account is seeded. |
+| `investor` | Counterparty, **not an admin role**. Investor login is a separate passwordless flow (M10-full); S10–S13 use `investor@dev.local` as read context, not an admin login. | Investor-portal integration (M10-full / BE-14). |
+| `supplier` | Counterparty with **no self-login** — suppliers are acted-on by ops via agency consent (mock S14 = "acting-as"). | Only if a supplier self-login is ever introduced (not planned). |
+| `buyer` | Counterparty; the buyer **ack-user** logs in via a separate passwordless email+OTP flow (WS-2, `ack@dev.local`), not the admin password login. | WS-2 buyer-portal login. |
+
+**Implementation (work-order step 2.3):** a live email→persona map for the 5 rows above; leave the mock
+`LOGIN_PERSONA_MAP` untouched. Persona is **advisory** for UI navigation only — the backend enforces
+authorization from the bearer's real roles; the UI never grants access the backend wouldn't.
 
 Money is **integer paise**; rates are **bps**. The mock already uses both — keep them.
 

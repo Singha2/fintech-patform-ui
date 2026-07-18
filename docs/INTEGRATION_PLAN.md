@@ -561,17 +561,21 @@ gap was closed by a backend change during integration.
 ## Appendix A — Seeded dev accounts (from `DevDataSeeder`)
 
 Password for all admins: **`DevPass123!`**. OTP peek (dev): `GET /api/v1/dev/last-otp?email=<email>`.
+**Canonical role⇄persona mapping (incl. the 5 UI personas NOT live-mapped): `API_ALIGNMENT.md §1.4`.**
 
-| Email | Backend role | Use for screens |
-|---|---|---|
-| `super@dev.local` | `super_admin` | S2, admin-user provisioning |
-| `ops@dev.local` | `ops_executive` | S3, S5 (maker), S7 maturity, S8 sign-up, subscribe |
-| `credit@dev.local` | `credit_reviewer` | S4 (credit), S5 supplier/buyer profiles |
-| `compliance@dev.local` | `compliance_reviewer` | S8 invite issue, KYC approve/reject, Form 16A issue |
-| `treasury@dev.local` | `treasury_and_settlement` | S5 go-live, S6 draft (maker), S7 distribution (maker) |
-| `treasury2@dev.local` | `treasury_and_settlement` | S6 approve, S7 distribution (checker ≠ maker) |
-| `ack@dev.local` | buyer ack user (OTP-only) | S15 |
-| `investor@dev.local` | investor identity | S10–S13 context |
+| Email | Backend role | UI persona (live) | Use for screens |
+|---|---|---|---|
+| `super@dev.local` | `super_admin` | `super-admin` | S2, admin-user provisioning |
+| `ops@dev.local` | `ops_executive` | `ops-executive` | S3, S5 (maker), S7 maturity, S8 sign-up, subscribe |
+| `credit@dev.local` | `credit_reviewer` | `credit-reviewer` | S4 (credit), S5 supplier/buyer profiles |
+| `compliance@dev.local` | `compliance_reviewer` | `compliance-reviewer` | S8 invite issue, KYC approve/reject, Form 16A issue |
+| `treasury@dev.local` | `treasury_and_settlement` | `treasury-settlement` | S5 go-live, S6 draft (maker), S7 distribution (maker) |
+| `treasury2@dev.local` | `treasury_and_settlement` | `treasury-settlement` | S6 approve, S7 distribution (checker ≠ maker) |
+| `ack@dev.local` | buyer ack user (OTP-only) | — (buyer portal, WS-2) | S15 |
+| `investor@dev.local` | investor identity | — (investor context, M10-full) | S10–S13 |
+
+The mock's composite `ops-treasury` persona has **no** live account (its steps split across `ops@` and
+`treasury@`/`treasury2@`); `auditor`/`investor`/`supplier`/`buyer` are not live-mapped this phase — see §1.4.
 
 Seed counterparty ids: `GET /api/v1/dev/seed-info` → `{supplier_id, buyer_id, investor_id, admins_password}`.
 
