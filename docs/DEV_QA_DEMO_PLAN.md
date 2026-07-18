@@ -1,0 +1,95 @@
+# Dev-Profile QA + Demo Plan (local)
+
+Goal: bring the app up on the **live dev backend**, create data for every screen, walk each journey, and be ready
+to demo to the Founder. ~30 min. All dev admin accounts use password **`DevPass123!`** and the OTP **auto-fills**.
+
+---
+
+## 1. Start it up
+
+1. **Backend** (seeds 7 admins + 1 supplier/buyer/investor + a pricing band on first boot):
+   ```
+   cd fintech-platform-backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+   ```
+   Wait for `Started ... Application`.
+2. **UI — must be live mode** (default is offline mock; if you skip `VITE_DATA_MODE=live` you are NOT hitting the backend):
+   ```
+   cd fintech-patform-mock && npm install && VITE_DATA_MODE=live npm run dev
+   ```
+   Open http://localhost:5173.
+3. **Sanity:** `curl -s localhost:8080/api/v1/dev/seed-info` returns ids → you're good.
+
+---
+
+## 2. Two things to know
+
+- **"Viewing as" dropdown** (top bar) = which **screens** you see.
+- **The account you logged in as** = what you're allowed to **do**. A **403** means wrong role → log out (top bar) and log in as the account noted below.
+
+| Log in as | Role | Drives |
+|---|---|---|
+| `ops@dev.local` | Ops | create / identity / KYC-submit / financial / MIA / activate, ops-checks, record-maturity |
+| `ops2@dev.local` | Ops (2nd) | **Document Completeness** check (DOC.3 needs a *different* ops than who uploaded) |
+| `compliance@dev.local` | Compliance | issue invite, suitability, KYC approve |
+| `credit@dev.local` | Credit | buyer credit assessment |
+| `treasury@dev.local` | Treasury | go-live approve, disbursement (maker), distribution (draft) |
+| `treasury2@dev.local` | Treasury (2nd) | disbursement approve, distribution approve (checker ≠ maker) |
+
+---
+
+## 3. Seed money-flow data (once — populates marketplace, disbursement, distribution, portfolio)
+
+Paste in a terminal:
+```
+for s in live live disbursable disbursed matured; do \
+  curl -s -X POST localhost:8080/api/v1/dev/seed-listing -H 'Content-Type: application/json' -d "{\"stage\":\"$s\"}" >/dev/null; done
+```
+Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfolio) have rows.
+
+---
+
+## 4. Walk the journeys (tick each)
+
+**A. Login & dashboard**
+- [ ] Log in `ops@` → lands on **S2**; tiles + queue counts show numbers.
+
+**B. Onboarding** (creates data + shows the role hand-offs)
+- [ ] **Supplier (S3):** `ops@` Create supplier → Identity → Submit KYC → **login `compliance@`** Approve KYC → **login `credit@`** Credit Review → **login `ops@`** MAA → Activate → **Active**.
+- [ ] **Buyer (S4):** `ops@` Nominate → Identity → **`credit@`** Credit Assessment → **`ops@`** Engagement → Activate → **Active**.
+- [ ] **Investor invite (S8):** **`compliance@`** Issue Invite → shows in the list.
+- [ ] **Investor onboarding (S10):** `ops@` Sign Up (pick the pending invite; enter email/phone) → Identity → Submit KYC → **`compliance@`** Assess Suitability → **`ops@`** Financial Profile → **`compliance@`** Approve KYC → **`ops@`** MIA → Activate → **Active**.
+
+**C. Deal flow — the hero demo**
+- [ ] **Go-live (S5):** `ops@` Create listing → record the checks → **Upload Invoice PDF** (any PDF) → **login `ops2@`** record **Document Completeness** → **`ops@`** finish checks → Send to Listing Approval → **login `treasury@`** Approve Go-Live → listing **Live**.
+- [ ] **Subscribe (S12):** open a live listing (via **S11**) → enter an amount → Commit → committed total rises.
+- [ ] **Disburse (S6):** **`treasury2@`** → open the drafted disbursement → Approve → **Disbursed**.
+- [ ] **Maturity + distribution (S7):** **`ops@`** Record Maturity → **`treasury@`** Draft Distribution → **login `treasury2@`** Approve → **Distributed**.
+
+**D. Investor portal (read-only today)**
+- [ ] **Portfolio (S13):** switch **Viewing as → Investor** → positions, summary tiles, and TDS show (from the seeded investor).
+- [ ] **Marketplace (S11):** live listings are listed.
+
+**E. Read-only / still mock**
+- [ ] **S14** supplier tracker — read.
+- [ ] **S9** auditor & **S15** buyer portal — **mock/deferred**; show as placeholders, don't test as live.
+
+---
+
+## 5. Founder demo (10 min, happy path)
+Login → **S2** dashboard → one **supplier onboarding (S3)** → **go-live (S5)** → **subscribe (S12)** → **disburse (S6)** → **distribute (S7)** → **investor portfolio (S13)**.
+
+---
+
+## 6. Investor self-service — **TO BE ADDED after BE-18**
+> _Placeholder — Amit to fill in once `BE18_INVESTOR_LOGIN_SELFCOMMIT_BRIEF.md` ships._
+> Today the investor portal is **read-only**: S10/S12 are ops-on-behalf and S13 uses a dev bearer. After BE-18,
+> add the **passwordless investor login** (email + OTP) and **investor self-commit** (the investor subscribes as
+> themselves) steps here.
+
+---
+
+## Tips
+- **403?** Wrong role — log out (top bar) and log in as the account the step names.
+- **Screen empty?** Either run the seed in §3, or you haven't yet driven the journey that creates that data.
+- **OTP** auto-fills in dev; if it doesn't, `curl "localhost:8080/api/v1/dev/last-otp?email=<the-email>"`.
+- **Reset:** restarting the backend keeps data (idempotent). For a clean slate, ask the backend team to drop the dev DB.
