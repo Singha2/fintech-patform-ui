@@ -36,19 +36,23 @@ through S1, and screenshots. Paths below are relative to the **repo root**.
    ```
 2. Drive it:
    ```
-   # Default smoke — proves the S2 "Admin & Roles" widget shows for super_admin, not for ops:
+   # Default smoke — all four login flows + the super-admin-only widget gate:
    node .claude/skills/run-fintech-mock/driver.mjs
+   #   → super@ (widget ✓) · ops@ (widget ✗) · investor@ (→ marketplace) · ack@ (→ buyer portal), screenshots each.
 
-   # Ad-hoc — log in as any admin account, open a path, screenshot:
-   node .claude/skills/run-fintech-mock/driver.mjs treasury@dev.local /s6
+   # Ad-hoc — the login flow is inferred from the email; open an optional path, screenshot:
+   node .claude/skills/run-fintech-mock/driver.mjs treasury@dev.local /s6   # admin
+   node .claude/skills/run-fintech-mock/driver.mjs investor@dev.local       # passwordless → marketplace
+   node .claude/skills/run-fintech-mock/driver.mjs ack@dev.local            # buyer ack-user portal (/s15)
    ```
    Screenshots land in `.claude/skills/run-fintech-mock/screenshots/` (gitignored). **Open the PNG** — a blank
    or error page means it didn't really launch.
 3. Stop the dev server when done: `pkill -f vite`.
 
-The driver's `loginAdmin(email)` covers the **admin** accounts (`super@`, `ops@`, `credit@`, `compliance@`,
-`treasury@`, `treasury2@`) — fill `#email`+`#password` → **Login** → OTP auto-fills into `#otp` → **Verify** →
-lands on S2 (`text=Work Queue`).
+The driver picks the login flow from the email (`loginFor`):
+- **admin** (`super@`/`ops@`/`credit@`/`compliance@`/`treasury@`/`treasury2@`) — `#email`+`#password` → **Login** → OTP auto-fills into `#otp` → **Verify** → S2 (`text=Work Queue`).
+- **investor** (`investor@dev.local`) — S1 **"Investor?"** toggle → email → **Send OTP** → auto-fill → **Verify & Enter** → `/s11` marketplace.
+- **buyer** (`ack@dev.local`) — standalone **/s15** portal → email → **Send OTP** → auto-fill → **Verify** → `text=Per-invoice acknowledgment`.
 
 ## Gotchas (specific to this app)
 
@@ -56,9 +60,9 @@ lands on S2 (`text=Work Queue`).
   + email + **Log out**; the sidebar is derived from `/auth/session` roles (`screenIdsForSession` in `routes.js`).
   The "Viewing as" dropdown exists **only in mock mode**. Don't wait for it in live.
 - **OTP auto-fills** in dev (S1 calls `/dev/last-otp`). The driver waits for `#otp` to reach 6 chars — don't type it.
-- **Investor / buyer login is different** and *not* covered by `loginAdmin`: investor uses S1's
-  **"Investor? Log in with email + OTP"** toggle (email-only, `investor@dev.local`); buyer is the standalone
-  **/s15** portal with its own OTP screen (`ack@dev.local`). Both are passwordless.
+- **Three login shapes, routed by email.** Admin = password+OTP on S1; investor = S1's **"Investor?"** toggle
+  (passwordless); buyer = the standalone **/s15** portal (passwordless). The Verify button differs — admin/investor
+  say **"Verify & Enter"**, buyer says **"Verify"** (the driver matches `/Verify/` for both).
 - **React controlled inputs:** use Playwright `fill`/`type`, not `el.value = …` (won't fire onChange).
 - **A `/favicon.ico` 404** in the console is expected (no icon in `index.html`) — cosmetic, ignore.
 - **Must be `VITE_DATA_MODE=live`.** Plain `npm run dev` is offline mock — the app renders but never hits the
