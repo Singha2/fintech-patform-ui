@@ -2,10 +2,10 @@
 // (no browser download). See SKILL.md for setup + prerequisites.
 //
 // Usage (from repo root, dev server on :5173, backend on :8080):
-//   node .claude/skills/run-fintech-mock/driver.mjs                        # smoke: super/ops (admin widget) + investor + buyer
-//   node .claude/skills/run-fintech-mock/driver.mjs ops@dev.local /s5      # admin: login, goto <path>, screenshot
-//   node .claude/skills/run-fintech-mock/driver.mjs investor@dev.local     # investor: passwordless login → marketplace
-//   node .claude/skills/run-fintech-mock/driver.mjs ack@dev.local          # buyer: /s15 ack-user portal login
+//   node .claude/skills/run-fintech-ui/driver.mjs                        # smoke: super/ops (admin widget) + investor + buyer
+//   node .claude/skills/run-fintech-ui/driver.mjs ops@dev.local /s5      # admin: login, goto <path>, screenshot
+//   node .claude/skills/run-fintech-ui/driver.mjs investor@dev.local     # investor: passwordless login → marketplace
+//   node .claude/skills/run-fintech-ui/driver.mjs ack@dev.local          # buyer: /s15 ack-user portal login
 // Login flow is inferred from the email (investor* → investor, ack* → buyer, else admin).
 //
 // Env: APP_URL (default http://localhost:5173) · CHROME_PATH (auto-detected if unset).

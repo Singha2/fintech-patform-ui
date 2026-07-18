@@ -1,5 +1,5 @@
 ---
-name: run-fintech-mock
+name: run-fintech-ui
 description: Launch, run, and browser-drive the fintech mock UI in LIVE mode and screenshot it — verify a screen/widget works against the dev backend. Use when asked to run/start/screenshot the app, drive it in a browser, or confirm a UI change works live (login as a dev account, navigate, capture). Local dev (Vite on :5173 + Spring backend on :8080); drives system Chrome via playwright-core.
 ---
 
@@ -37,15 +37,15 @@ through S1, and screenshots. Paths below are relative to the **repo root**.
 2. Drive it:
    ```
    # Default smoke — all four login flows + the super-admin-only widget gate:
-   node .claude/skills/run-fintech-mock/driver.mjs
+   node .claude/skills/run-fintech-ui/driver.mjs
    #   → super@ (widget ✓) · ops@ (widget ✗) · investor@ (→ marketplace) · ack@ (→ buyer portal), screenshots each.
 
    # Ad-hoc — the login flow is inferred from the email; open an optional path, screenshot:
-   node .claude/skills/run-fintech-mock/driver.mjs treasury@dev.local /s6   # admin
-   node .claude/skills/run-fintech-mock/driver.mjs investor@dev.local       # passwordless → marketplace
-   node .claude/skills/run-fintech-mock/driver.mjs ack@dev.local            # buyer ack-user portal (/s15)
+   node .claude/skills/run-fintech-ui/driver.mjs treasury@dev.local /s6   # admin
+   node .claude/skills/run-fintech-ui/driver.mjs investor@dev.local       # passwordless → marketplace
+   node .claude/skills/run-fintech-ui/driver.mjs ack@dev.local            # buyer ack-user portal (/s15)
    ```
-   Screenshots land in `.claude/skills/run-fintech-mock/screenshots/` (gitignored). **Open the PNG** — a blank
+   Screenshots land in `.claude/skills/run-fintech-ui/screenshots/` (gitignored). **Open the PNG** — a blank
    or error page means it didn't really launch.
 3. Stop the dev server when done: `pkill -f vite`.
 
