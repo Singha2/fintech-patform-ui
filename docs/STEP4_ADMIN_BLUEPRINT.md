@@ -5,7 +5,7 @@
 Self-contained spec for building the eight admin screens into the existing
 React + Tailwind app (skeleton from Step 1, investor flow from Step 2).
 
-**Place alongside:** `STEP0_OUTPUT.md`, `STEP2_INVESTOR_BLUEPRINT.md`, `Mock_Build_Plan.md`
+**Place alongside:** `STEP0_OUTPUT.md`, `STEP2_INVESTOR_BLUEPRINT.md`, `UI_Build_Plan.md`
 
 **Hard limits (same as Step 2):**
 - Hardcoded JSON only — no API calls, no backend.
@@ -785,7 +785,7 @@ Columns: Timestamp | Event Type | Actor | Target | Sensitivity
 
 ```
 Read STEP4_ADMIN_BLUEPRINT.md, STEP2_INVESTOR_BLUEPRINT.md, STEP0_OUTPUT.md,
-and Mock_Build_Plan.md in this folder.
+and UI_Build_Plan.md in this folder.
 
 Implement Step 4 only: build the eight admin screens (S1–S9) into the existing
 React + Vite + Tailwind app. Use only the component kit already built

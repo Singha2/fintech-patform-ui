@@ -6,7 +6,7 @@ This file is the complete, self-contained spec for building the four investor sc
 into the existing React + Tailwind skeleton (built in Step 1).
 
 **What to do:**
-1. Place this file alongside `STEP0_OUTPUT.md` and `Mock_Build_Plan.md` in your project folder.
+1. Place this file alongside `STEP0_OUTPUT.md` and `UI_Build_Plan.md` in your project folder.
 2. Use the Claude Code prompt at the bottom of this file.
 3. Claude Code reads this file and builds all four screens into the existing app.
 
@@ -476,7 +476,7 @@ From `statements[]`. "Download" button per row (mock — always enabled).
 ## Claude Code Prompt — Copy and Paste This
 
 ```
-Read STEP2_INVESTOR_BLUEPRINT.md, STEP0_OUTPUT.md, and Mock_Build_Plan.md in this folder.
+Read STEP2_INVESTOR_BLUEPRINT.md, STEP0_OUTPUT.md, and UI_Build_Plan.md in this folder.
 
 Implement Step 2 only: build the four investor screens (S10, S11, S12, S13) into
 the existing React + Vite + Tailwind app from Step 1. Use only the component kit

@@ -1,10 +1,10 @@
-# Mock Build Plan — Fintech Platform MVP
+# UI Build Plan — Fintech Platform MVP
 
-**Purpose.** This is the operating manual for building the 15-screen interactive React mock of the invoice-discounting platform. It is the single reference any build session points to. Add it to the project so every new session can read it.
+**Purpose.** This is the operating manual for building the 15-screen interactive React UI for the invoice-discounting platform. It is the single reference any build session points to. Add it to the project so every new session can read it.
 
-**What the mock is.** A clickable React + Tailwind app on hardcoded JSON — no backend, no auth, no real logic. Its three jobs: (1) align the founder by letting them *click*, (2) force end-to-end flow clarity, (3) seed the API contracts via its mock-data shapes. The screens are built in the real frontend stack so they become production seeds later, not throwaway.
+**What the UI is.** A clickable React + Tailwind app on hardcoded JSON — no backend, no auth, no real logic. Its three jobs: (1) align the founder by letting them *click*, (2) force end-to-end flow clarity, (3) seed the API contracts via its mock-data shapes. The screens are built in the real frontend stack so they become production seeds later, not throwaway.
 
-**One discipline above all.** You review the mock by *clicking it*, not by reading its source. The "lost in thousands of lines" concern applies to the real backend later — not to this mock.
+**One discipline above all.** You review the UI by *clicking it*, not by reading its source. The "lost in thousands of lines" concern applies to the real backend later — not to this UI.
 
 ---
 
@@ -108,9 +108,9 @@ The **Data shown** and **Actions** lines do double duty: human spec *and* the se
 
 Paste at the start of each build session. Scope it to the step(s) you're doing.
 
-> I'm building the Fintech Platform MVP (invoice discounting). All platform docs are in this project — Decision Log, Product Spec, Architectural Constraints, Bounded Contexts, SQL schema — plus `Mock_Build_Plan.md` describing a 6-step approach to a 15-screen interactive React mock.
+> I'm building the Fintech Platform MVP (invoice discounting). All platform docs are in this project — Decision Log, Product Spec, Architectural Constraints, Bounded Contexts, SQL schema — plus `UI_Build_Plan.md` describing a 6-step approach to a 15-screen interactive React UI.
 >
-> First, read `Mock_Build_Plan.md` and the Spec's personas/journeys. Confirm you understand the 15 screens and the 6 steps.
+> First, read `UI_Build_Plan.md` and the Spec's personas/journeys. Confirm you understand the 15 screens and the 6 steps.
 >
 > Today we do **Step <N> ONLY**: [paste the Tell-Claude line for that step].
 >
@@ -118,7 +118,7 @@ Paste at the start of each build session. Scope it to the step(s) you're doing.
 
 ---
 
-## 7. Tech Notes for the Mock
+## 7. Tech Notes for the UI
 
 - **Stack:** React + Tailwind (matches the production frontend). React Router for navigation.
 - **No backend, no API calls, no real auth.** Fake login sets a role in state; the persona switcher flips it.
@@ -130,4 +130,4 @@ Paste at the start of each build session. Scope it to the step(s) you're doing.
 
 ## 8. Where This Sits in the Bigger Plan
 
-Once a flow's mock is stable, extract its `mockData.js` shapes into OpenAPI specs. The mock is the front edge of the architecture work; schema fixing (Flyway migrations, the `tblMfaFactor` collision, dropping deferred tables) runs in parallel because it has no dependency on the mock.
+Once a flow's UI is stable, extract its `mockData.js` shapes into OpenAPI specs. The UI is the front edge of the architecture work; schema fixing (Flyway migrations, the `tblMfaFactor` collision, dropping deferred tables) runs in parallel because it has no dependency on the UI.

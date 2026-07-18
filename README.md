@@ -1,6 +1,6 @@
-# Fintech Platform — MVP Mock
+# Fintech Platform — MVP UI
 
-An interactive, clickable mock of a **15-screen invoice-discounting platform**.
+An interactive, clickable UI for a **15-screen invoice-discounting platform**.
 Built with **React 18 + Vite + Tailwind CSS + React Router v6**.
 
 > ⚠️ **This is a front-end-only prototype.** There is **no backend, no database, and no real authentication**. Every screen reads from hardcoded data in `src/data/mockData.js`. Its purpose is founder alignment, flow clarity, and seeding future API contracts — not production use.
@@ -196,7 +196,7 @@ The `dist/` folder can be served by any static host. `wrangler.toml` is set up f
 
 Deeper specs live in `docs/`:
 
-- `Mock_Build_Plan.md` — overall approach and 6-step build recipe
+- `UI_Build_Plan.md` — overall approach and 6-step build recipe
 - `STEP0_OUTPUT.md` — navigation map + screen inventory
 - `STEP2_INVESTOR_BLUEPRINT.md` — investor flow spec (S10–S13)
 - `STEP4_ADMIN_BLUEPRINT.md` — admin console spec (S1–S9)

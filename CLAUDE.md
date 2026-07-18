@@ -60,7 +60,7 @@ src/
     buyer/     S15.jsx
 
 docs/
-  Mock_Build_Plan.md             # 6-step build recipe + operating rules
+  UI_Build_Plan.md             # 6-step build recipe + operating rules
   STEP0_OUTPUT.md                # nav map (Mermaid) + screen inventory
   STEP2_INVESTOR_BLUEPRINT.md    # investor flow spec (S10–S13)
   STEP4_ADMIN_BLUEPRINT.md       # admin console spec (S1–S9)

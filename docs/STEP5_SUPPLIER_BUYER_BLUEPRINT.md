@@ -6,7 +6,7 @@ Self-contained spec for building S14 and S15 into the existing React + Tailwind 
 (skeleton Step 1, investor flow Step 2, admin console Step 4).
 
 **Place alongside:** `STEP0_OUTPUT.md`, `STEP2_INVESTOR_BLUEPRINT.md`,
-`STEP4_ADMIN_BLUEPRINT.md`, `Mock_Build_Plan.md`
+`STEP4_ADMIN_BLUEPRINT.md`, `UI_Build_Plan.md`
 
 **Hard limits (same as previous steps):**
 - Hardcoded JSON only — no API calls, no backend.
@@ -382,7 +382,7 @@ No "Pay Now" button — payment initiation is out of scope (DL-021).
 
 ```
 Read STEP5_SUPPLIER_BUYER_BLUEPRINT.md, STEP4_ADMIN_BLUEPRINT.md,
-STEP0_OUTPUT.md, and Mock_Build_Plan.md in this folder.
+STEP0_OUTPUT.md, and UI_Build_Plan.md in this folder.
 
 Implement Step 5 only: build S14 (Supplier Portal) and S15 (Buyer Portal)
 into the existing React + Vite + Tailwind app. Use only the existing component
