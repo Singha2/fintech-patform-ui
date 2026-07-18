@@ -16,6 +16,7 @@ export const listings = {
   snapshotAndReady:  (id, body, v) => postCommand(`${base}/${id}/snapshot-and-ready`, body, { aggregateVersion: v }), // {rate_bps}
   approveGoLive:     (id, v)     => postCommand(`${base}/${id}/approve-go-live`, undefined, { aggregateVersion: v }),
   declareFundingShortfall: (id, v) => postCommand(`${base}/${id}/declare-funding-shortfall`, undefined, { aggregateVersion: v }),
+  attachInvoiceDoc:  (id, body)  => postCommand(`${base}/${id}/invoice-documents`, body),               // {document_id} — BC16 attach (stamps uploaded_by; gates document_completeness, DOC.3)
   // ── reads ──
   get:       (id)     => readById(`${base}/${id}`),                                     // {listing_id,status,funding_target,va_id,aggregate_version}
   list:      (status) => readById(`${base}${status ? `?status=${status}` : ''}`),       // BE-6 / BE-14 (S5/S11)

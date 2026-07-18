@@ -8,7 +8,7 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
-import { listings as listingsSvc } from '../../api/services/index.js'
+import { listings as listingsSvc, documents as documentsSvc } from '../../api/services/index.js'
 import { describe } from '../../api/errors.js'
 import { useStore } from '../../store/PlatformStore.jsx'
 import { useHydrate } from '../../store/useHydrate.js'
@@ -35,6 +35,7 @@ export default function S5() {
   const [pendingListingId, setPendingListingId] = useState(null)
   const [busy, setBusy]           = useState(false)
   const [err, setErr]             = useState('')
+  const [attachedDoc, setAttachedDoc] = useState({})   // { [listingId]: document_id } — invoice PDFs attached this session
 
   // Live: GET /listings → the ops queue (invoices) + approval list (listings) (BE-6); + the selected invoice's
   // ops-checks on open (two-level fetch). No-op in mock mode.
@@ -62,6 +63,22 @@ export default function S5() {
     try {
       const cur = await listingsSvc.get(listingId)
       await listingsSvc.requestBuyerAck(listingId, { sla_hours: 48 }, cur.aggregate_version)
+      await checkLive.reload()
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+  }
+
+  // Upload + attach the invoice PDF (BC16 two-phase): initiate → PUT bytes → finalize → attach to the listing.
+  // Gates `document_completeness`; DOC.3 then requires a *second* Ops user to record that check (recorder ≠ uploader).
+  async function uploadInvoiceDoc(listingId, file) {
+    setErr(''); setBusy(true)
+    try {
+      const blob = new Blob([await file.arrayBuffer()], { type: 'application/pdf' })
+      const init = await documentsSvc.initiate({ kind: 'invoice', content_type: 'application/pdf', declared_size: blob.size })
+      const docId = init?.document_id ?? init?.aggregate_id
+      await documentsSvc.uploadContent(docId, blob, 'application/pdf')
+      await documentsSvc.finalize(docId)
+      await listingsSvc.attachInvoiceDoc(listingId, { document_id: docId })
+      setAttachedDoc(prev => ({ ...prev, [listingId]: docId }))
       await checkLive.reload()
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
@@ -172,6 +189,18 @@ export default function S5() {
                   <div><p className="text-xs text-gray-400">Tenor</p><p className="font-semibold">{selectedInv.tenor_days}d</p></div>
                   <div><p className="text-xs text-gray-400">IRN (GST Verified)</p><p className="font-mono text-xs">{selectedInv.irn ? `${selectedInv.irn.slice(0, 20)}…` : '—'}</p></div>
                   <div><p className="text-xs text-gray-400">Due Date</p><p className="font-semibold">{formatDate(selectedInv.due_date)}</p></div>
+                </div>
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1.5">Invoice PDF <span className="text-gray-300">· BC16 — required for Document Completeness</span></p>
+                  {attachedDoc[selectedInv.invoice_id] ? (
+                    <p className="text-xs text-green-700">✓ Attached ({attachedDoc[selectedInv.invoice_id].slice(0, 8)}…) — record <span className="font-medium">Document Completeness</span> as a second Ops user (DOC.3, recorder ≠ uploader).</p>
+                  ) : (
+                    <label className="inline-flex items-center gap-2 text-xs text-indigo-700 cursor-pointer hover:text-indigo-900">
+                      <span className="px-3 py-1 rounded-md border border-indigo-200 bg-indigo-50">{busy ? 'Uploading…' : 'Upload Invoice PDF'}</span>
+                      <input type="file" accept="application/pdf" className="hidden" disabled={busy}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadInvoiceDoc(selectedInv.invoice_id, f); e.target.value = '' }} />
+                    </label>
+                  )}
                 </div>
               </Card>
 

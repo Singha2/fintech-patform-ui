@@ -226,9 +226,10 @@ are from those test cases, none from real flows).
   upload** (initiate → PUT → finalize → attach as `ops@`) → 7 ops-checks, where `document_completeness` by the
   uploader is **rejected (DOC.3)** and by `ops2@` **accepted** → complete-ops-checks → buyer-ack → snapshot-and-ready
   → **`ready_for_review`** → ops (maker) go-live **403** → `treasury@` approve → **`live` + VA**. 22/22 green.
-  ⚠️ **UI gap:** the invoice-document upload (BC16, kind `invoice`) has **no UI** yet, so `document_completeness`
-  can't be satisfied from the screen in live mode — a small upload+attach flow (or an ops2 re-login step) is the
-  remaining feature.
+  ✅ **Invoice-document upload now in the UI** (DF-4): S5's invoice detail has an **Upload Invoice PDF** control →
+  `documents.initiate {kind:'invoice'}` → `uploadContent` (PUT bytes) → `finalize` → `listings.attachInvoiceDoc
+  {document_id}`. Once attached, `document_completeness` is recorded by a **second Ops** user (DOC.3, recorder ≠
+  uploader) — surfaced as an inline note. New service: `src/api/services/documents.js`.
 
 - [x] **S12 subscribe** — `POST /listings/{id}/subscriptions/commit {investor_id, amount_paise}` (ops-on-behalf,
   OPS) → refresh. **E2E-verified** (`moneyflow.mjs`, `stage:"live"`): commit → `committed_total` increments by the
