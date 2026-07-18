@@ -77,7 +77,7 @@ That's it. The app runs entirely in your browser. Edit any file under `src/` and
 Because there is no real login, you navigate the app by **switching personas**:
 
 1. Most screens have a **"Viewing as" dropdown** in the top bar. Pick a persona to jump into that role's screens — the sidebar updates to show only the screens that persona can access.
-2. **S1 (`/s1`)** is a mock admin login screen. Choosing a login there just sets the persona and routes you into the app (no password is checked).
+2. **S1 (`/s1`)** is a simulated admin login screen. Choosing a login there just sets the persona and routes you into the app (no password is checked).
 3. **S15 (`/s15`)** is a standalone buyer OTP portal — enter any OTP value; nothing is validated.
 4. Every screen also has a **variant switcher** (pill buttons near the top) that lets you preview different states — e.g. "normal", "empty", or edge-case flows — without needing real data.
 
