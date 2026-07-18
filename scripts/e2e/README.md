@@ -17,6 +17,8 @@ Onboarding chains (each drives the full command sequence with SoD role hand-offs
   ack-user → payment-instruction → activate → `active` (BA.3 gate).
 - `investor-onboarding.mjs` — S10: **issue-invite (COMPLIANCE)** → sign-up → identity → submit-kyc →
   **assess-suitability (COMPLIANCE)** → financial → **kyc-approve (COMPLIANCE)** → mia → activate → `active`.
+- `invoice-submit.mjs` — S14 origination: create listing (`POST /listings` → deal_invoice `submitted`) →
+  BC16 doc flow (initiate → PUT → finalize → attach) → shows in the supplier tracker.
 
 Self-service + portals:
 - `investor-portfolio.mjs` — S13: investor login → own portfolio `{rows,summary}` + tax; cross-tenant → 403.

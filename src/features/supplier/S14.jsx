@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import Button from '../../components/kit/Button.jsx'
 import Card from '../../components/kit/Card.jsx'
@@ -10,6 +10,9 @@ import { formatPaise, formatDate, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 import { useStore } from '../../store/PlatformStore.jsx'
 import { useHydrate } from '../../store/useHydrate.js'
+import { listings as listingsSvc, documents as documentsSvc, buyers as buyersSvc, investors as investorsSvc } from '../../api/services/index.js'
+import { describe } from '../../api/errors.js'
+import { IS_LIVE, IS_DEV_BACKEND } from '../../config.js'
 
 const VARIANTS = [
   { id: 'normal',                  label: 'Normal' },
@@ -33,6 +36,11 @@ export default function S14() {
   const [expandedId, setExpandedId] = useState(null)
   const [mode, setMode] = useState('irn')
   const [draft, setDraft] = useState({ irn: '', invoice_number: '', buyer_id: '', face_value: '', invoice_date: '', tenor_days: '' })
+  const [pdfFile, setPdfFile] = useState(null)
+  const [liveBuyers, setLiveBuyers] = useState([])   // real buyers (GET /buyers) for the dropdown in live mode
+  const [liveSupplierId, setLiveSupplierId] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
 
   // The supplier whose portal this is — passed from S3 "Open Supplier Portal →" (falls back to the seeded one).
   const supplierId = location.state?.supplierId ?? mockData.S14.supplier.supplier_id
@@ -42,20 +50,56 @@ export default function S14() {
   const consentOff = variant === 'agency_consent_inactive'
   const checksFailed = variant === 'ops_checks_failed'
 
-  function set(k) { return e => setDraft(d => ({ ...d, [k]: e.target.value })) }
+  // Live: real buyers for the dropdown; resolve the acting-as supplier id (dev seed today).
+  useEffect(() => {
+    if (!IS_LIVE) return
+    buyersSvc.list().then(rows => setLiveBuyers((rows ?? []).filter(b => b.status === 'active'))).catch(() => {})
+    if (IS_DEV_BACKEND) investorsSvc.devSeedInfo().then(s => setLiveSupplierId(s?.supplier_id)).catch(() => {})
+  }, [])
 
-  function submitInvoice() {
-    const buyer = mockData.S14.available_buyers.find(b => b.buyer_id === draft.buyer_id)
-    storeSubmitInvoice({   // 🔗 POST /documents + POST /listings (ops-created)
-      invoice_number: draft.invoice_number || MOCK_GST.invoice_number,
-      buyer_id: draft.buyer_id || null, buyer_name: buyer?.legal_name ?? '—', face_value: parseInt(draft.face_value) || 0,
-      invoice_date: draft.invoice_date, due_date: '', tenor_days: parseInt(draft.tenor_days) || 0,
-      irn: mode === 'irn' ? draft.irn : null,
-      supplier_id: supplierId, supplier_name: supplier.legal_name, listing: null,
-    })
-    setDraft({ irn: '', invoice_number: '', buyer_id: '', face_value: '', invoice_date: '', tenor_days: '' })
-    setTab('invoices')
+  function set(k) { return e => setDraft(d => ({ ...d, [k]: e.target.value })) }
+  const resetDraft = () => { setDraft({ irn: '', invoice_number: '', buyer_id: '', face_value: '', invoice_date: '', tenor_days: '' }); setPdfFile(null) }
+
+  // Mock: seed a store invoice. Live: the real origination chain — create the listing (POST /listings, which
+  // creates the deal_invoice), then the BC16 document flow (initiate → PUT bytes → finalize → attach). Acting-as
+  // supplier (agency consent), so this is an OPS command; the buyer_id must be a real backend id.
+  async function submitInvoice() {
+    if (!IS_LIVE) {
+      const buyer = mockData.S14.available_buyers.find(b => b.buyer_id === draft.buyer_id)
+      storeSubmitInvoice({
+        invoice_number: draft.invoice_number || MOCK_GST.invoice_number,
+        buyer_id: draft.buyer_id || null, buyer_name: buyer?.legal_name ?? '—', face_value: parseInt(draft.face_value) || 0,
+        invoice_date: draft.invoice_date, due_date: '', tenor_days: parseInt(draft.tenor_days) || 0,
+        irn: mode === 'irn' ? draft.irn : null,
+        supplier_id: supplierId, supplier_name: supplier.legal_name, listing: null,
+      })
+      resetDraft(); setTab('invoices'); return
+    }
+    setErr(''); setBusy(true)
+    try {
+      const sid = liveSupplierId ?? supplierId
+      const env = await listingsSvc.create({
+        supplier_id: sid, buyer_id: draft.buyer_id,
+        invoice_number: draft.invoice_number, face_value_paise: parseInt(draft.face_value) || 0,
+        invoice_date: draft.invoice_date, tenor_days: parseInt(draft.tenor_days) || 0,
+        irn: mode === 'irn' ? (draft.irn || null) : null,
+      })
+      const listingId = env?.aggregate_id
+      if (pdfFile && listingId) {   // BC16 invoice-document flow
+        const blob = new Blob([await pdfFile.arrayBuffer()], { type: 'application/pdf' })
+        const init = await documentsSvc.initiate({ kind: 'invoice', content_type: 'application/pdf', declared_size: blob.size })
+        const docId = init?.document_id ?? init?.aggregate_id
+        await documentsSvc.uploadContent(docId, blob, 'application/pdf')
+        await documentsSvc.finalize(docId)
+        await listingsSvc.attachInvoiceDoc(listingId, { document_id: docId })
+      }
+      await live.reload()
+      resetDraft(); setTab('invoices')
+    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
+
+  const buyerOptions = IS_LIVE ? liveBuyers : mockData.S14.available_buyers
+  const submitDisabled = consentOff || busy || (IS_LIVE && (!draft.invoice_number || !draft.buyer_id || !draft.face_value || !draft.invoice_date || !draft.tenor_days))
 
   const cols = [
     { key: 'invoice_number', label: 'Invoice #' },
@@ -171,19 +215,24 @@ export default function S14() {
               <label className="text-sm font-medium text-gray-700">Buyer</label>
               <select className="rounded-md border border-gray-300 px-3 py-2 text-sm disabled:bg-gray-50 disabled:text-gray-500" disabled={consentOff} value={draft.buyer_id} onChange={set('buyer_id')}>
                 <option value="">— Select buyer —</option>
-                {mockData.S14.available_buyers.map(b => <option key={b.buyer_id} value={b.buyer_id}>{b.legal_name}</option>)}
+                {buyerOptions.map(b => <option key={b.buyer_id} value={b.buyer_id}>{b.legal_name}</option>)}
               </select>
             </div>
             <FormField label="Face Value (paise)" id="fv"    type="number" value={draft.face_value}   onChange={set('face_value')}   disabled={consentOff} />
             <FormField label="Invoice Date"        id="idate" type="date"   value={draft.invoice_date} onChange={set('invoice_date')} disabled={consentOff} />
             <FormField label="Tenor days (1–180)"  id="tenor" type="number" min={1} max={180} value={draft.tenor_days} onChange={set('tenor_days')} disabled={consentOff} />
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium text-gray-700">Invoice document PDF</label>
-              <Button variant="ghost" className="self-start text-xs" disabled={consentOff}>Mock Upload</Button>
+              <label className="text-sm font-medium text-gray-700">Invoice document PDF{IS_LIVE ? '' : ' (optional)'}</label>
+              {IS_LIVE
+                ? <input type="file" accept="application/pdf" className="text-xs" disabled={consentOff}
+                    onChange={e => setPdfFile(e.target.files?.[0] ?? null)} />
+                : <Button variant="ghost" className="self-start text-xs" disabled={consentOff}>Mock Upload</Button>}
+              {IS_LIVE && <p className="text-xs text-gray-400">Attached after the listing is created (BC16). Optional — the doc can also be uploaded during ops-checks (S5).</p>}
             </div>
           </div>
-          <Button disabled={consentOff} onClick={submitInvoice}>Submit Invoice</Button>
+          <Button disabled={submitDisabled} onClick={submitInvoice}>{busy ? 'Submitting…' : 'Submit Invoice'}</Button>
           {consentOff && <p className="text-xs text-red-600 mt-2">Agency consent revoked — all actions blocked.</p>}
+          {err && <p className="text-xs text-red-600 mt-2">Submit failed: {err}</p>}
         </Card>
       )}
 
