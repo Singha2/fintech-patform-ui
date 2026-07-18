@@ -1,7 +1,8 @@
 # Dev-Profile QA + Demo Plan (local)
 
 Goal: bring the app up on the **live dev backend**, create data for every screen, walk each journey, and be ready
-to demo to the Founder. ~30 min. All dev admin accounts use password **`DevPass123!`** and the OTP **auto-fills**.
+to demo to the Founder. ~30 min. Dev **admins** log in with password **`DevPass123!`**; the **investor** logs in
+**passwordless** (email + OTP, §6). The OTP **auto-fills** in dev either way.
 
 ---
 
@@ -24,7 +25,8 @@ to demo to the Founder. ~30 min. All dev admin accounts use password **`DevPass1
 ## 2. Two things to know
 
 - **"Viewing as" dropdown** (top bar) = which **screens** you see.
-- **The account you logged in as** = what you're allowed to **do**. A **403** means wrong role → log out (top bar) and log in as the account noted below.
+- **The account you logged in as** = what you're allowed to **do**. A **403** means wrong role.
+- **To switch account** (there's no logout button yet): open the login screen at **http://localhost:5173/s1** and log in as the needed account — the new login **replaces** the session.
 
 | Log in as | Role | Drives |
 |---|---|---|
@@ -34,6 +36,7 @@ to demo to the Founder. ~30 min. All dev admin accounts use password **`DevPass1
 | `credit@dev.local` | Credit | buyer credit assessment |
 | `treasury@dev.local` | Treasury | go-live approve, disbursement (maker), distribution (draft) |
 | `treasury2@dev.local` | Treasury (2nd) | disbursement approve, distribution approve (checker ≠ maker) |
+| `investor@dev.local` | Investor (self-service) | **passwordless** login (email + OTP, *no password*) — browse, self-subscribe, portfolio → see §6 |
 
 ---
 
@@ -65,8 +68,8 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 - [ ] **Disburse (S6):** **`treasury2@`** → open the drafted disbursement → Approve → **Disbursed**.
 - [ ] **Maturity + distribution (S7):** **`ops@`** Record Maturity → **`treasury@`** Draft Distribution → **login `treasury2@`** Approve → **Distributed**.
 
-**D. Investor portal (read-only today)**
-- [ ] **Portfolio (S13):** switch **Viewing as → Investor** → positions, summary tiles, and TDS show (from the seeded investor).
+**D. Investor portal** (full self-service journey is **§6** — this is the quick admin-side view)
+- [ ] **Portfolio (S13):** switch **Viewing as → Investor** → positions, summary tiles, and TDS show.
 - [ ] **Marketplace (S11):** live listings are listed.
 
 **E. Read-only / still mock**
@@ -76,7 +79,9 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 ---
 
 ## 5. Founder demo (10 min, happy path)
-Login → **S2** dashboard → one **supplier onboarding (S3)** → **go-live (S5)** → **subscribe (S12)** → **disburse (S6)** → **distribute (S7)** → **investor portfolio (S13)**.
+Two acts:
+1. **Platform runs a deal** (admin): login → **S2** dashboard → one **supplier onboarding (S3)** → **go-live (S5)** → **disburse (S6)** → **distribute (S7)**.
+2. **A real investor invests** (self-service): open **/s1** → **investor login** (email + OTP, §6) → **S11** browse → **S12** subscribe → **S13** portfolio — no Ops in the loop.
 
 ---
 
@@ -91,7 +96,7 @@ _Ops-on-behalf still works: an admin can also subscribe for an investor from S12
 ---
 
 ## Tips
-- **403?** Wrong role — log out (top bar) and log in as the account the step names.
+- **403?** Wrong role — open **/s1** and log in as the account the step names (re-login replaces the session; there's no logout button yet).
 - **Screen empty?** Either run the seed in §3, or you haven't yet driven the journey that creates that data.
 - **OTP** auto-fills in dev; if it doesn't, `curl "localhost:8080/api/v1/dev/last-otp?email=<the-email>"`.
 - **Reset:** restarting the backend keeps data (idempotent). For a clean slate, ask the backend team to drop the dev DB.
