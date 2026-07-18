@@ -2,12 +2,12 @@
 
 > **Source of truth: the backend.** The Spring Boot platform at
 > `/Users/amitsingh/IdeaProjects/fintech-platform-backend` (served under **`/api/v1`**) is now the
-> authoritative definition of every entity, command, status enum, and response shape. This UI mock exists to
+> authoritative definition of every entity, command, status enum, and response shape. This UI exists to
 > *visualise* that platform. Where this doc and any older UI-side spec disagree, **this doc + the backend win.**
 > Backend catalogue: `fintech-platform-backend/docs/API_CATALOGUE.md`.
 
 This document maps each of the 15 UI screens to the real backend endpoints, records the exact request/response
-shapes the UI must conform to, corrects the mock's enum values to the real ones, and registers the **read-side
+shapes the UI must conform to, corrects the UI's enum values to the real ones, and registers the **read-side
 gaps** — places where a screen needs data the backend does not yet expose.
 
 ---
@@ -71,14 +71,14 @@ real logins.)
 | `ops-treasury` | **Composite** (`ops_executive` + `treasury_and_settlement`) — no single backend role/account holds both. A **mock-only** single-actor shortcut for the golden-path walk. Live, the same steps split across `ops@` (checks) and `treasury@`/`treasury2@` (go-live/disburse) — the real maker-checker separation. | Never for live (the split *is* the correct behaviour). Stays mock-only. |
 | `auditor` | `auditor` is a real `admin_role`, but **no auditor dev account is seeded** and the audit-read API is deferred (M17 / BE-13). | M17 audit-read ships **and** an auditor dev account is seeded. |
 | `investor` | Counterparty, **not an admin role**. Investor login is a separate passwordless flow (M10-full); S10–S13 use `investor@dev.local` as read context, not an admin login. | Investor-portal integration (M10-full / BE-14). |
-| `supplier` | Counterparty with **no self-login** — suppliers are acted-on by ops via agency consent (mock S14 = "acting-as"). | Only if a supplier self-login is ever introduced (not planned). |
+| `supplier` | Counterparty with **no self-login** — suppliers are acted-on by ops via agency consent (UI S14 = "acting-as"). | Only if a supplier self-login is ever introduced (not planned). |
 | `buyer` | Counterparty; the buyer **ack-user** logs in via a separate passwordless email+OTP flow (WS-2, `ack@dev.local`), not the admin password login. | WS-2 buyer-portal login. |
 
 **Implementation (work-order step 2.3):** a live email→persona map for the 5 rows above; leave the mock
 `LOGIN_PERSONA_MAP` untouched. Persona is **advisory** for UI navigation only — the backend enforces
 authorization from the bearer's real roles; the UI never grants access the backend wouldn't.
 
-Money is **integer paise**; rates are **bps**. The mock already uses both — keep them.
+Money is **integer paise**; rates are **bps**. The UI already uses both — keep them.
 
 ---
 
@@ -126,7 +126,7 @@ Commands (all ✅), read is by-id only.
 | read | `GET /buyers/{id}` → `{ buyer_id, status, aggregate_version }` · `GET /buyers/{id}/kyb-verification` → `{ kyb_verified, kyb_verified_by, kyb_verified_at, kyb_document_id }` |
 
 > Buyer **list** + display fields = **Gap G3.** Note: pricing band has a rate **range** (`min/max_bps`) + `fee_bps`,
-> not a single `rate_bps` as the mock has.
+> not a single `rate_bps` as the UI has.
 
 ### S5 — Invoice checks + listing approval ⚠️
 Listing lifecycle commands (✅); the invoice "check_outcomes" grid maps to individual ops-checks.
@@ -145,7 +145,7 @@ Listing lifecycle commands (✅); the invoice "check_outcomes" grid maps to indi
 
 > **Canonical ops-check names** (`check_name`): `irn_validity`, `eway_bill_match`, `buyer_supplier_relationship`,
 > `duplicate_check`, `supplier_exposure_cap`, `buyer_limit_headroom`, `document_completeness`. `outcome` is
-> `passed` (or null for vendor checks like `irn_validity`). The mock's keys (`irn_verified`, `buyer_supplier_rel`,
+> `passed` (or null for vendor checks like `irn_validity`). The UI's keys (`irn_verified`, `buyer_supplier_rel`,
 > `exposure_cap`, `buyer_limit`, `doc_completeness`) must be renamed to these. Buyer-ack is a **separate** command,
 > not an ops-check. The invoice **list** + supplier/buyer names = **Gap G4.**
 
@@ -157,7 +157,7 @@ Listing lifecycle commands (✅); the invoice "check_outcomes" grid maps to indi
 | read | `GET /listings/{id}/disbursement` → `{ payout_instruction_id, status, gross_amount, listing_status }` |
 
 > Disbursement `status` enum is **`cash_payout_status`**: `drafted, approved, sent, executed, partial, failed,
-> completed` — the mock's `pending_approval` must become `drafted`. There is **no queue list** endpoint; the
+> completed` — the UI's `pending_approval` must become `drafted`. There is **no queue list** endpoint; the
 > UTR/net-amount/maker-name display fields are not returned. **Gap G5.**
 
 ### S7 — Distribution + reconciliation ⚠️
@@ -180,7 +180,7 @@ Listing lifecycle commands (✅); the invoice "check_outcomes" grid maps to indi
 | read invite list | ❌ no endpoint |
 
 > `inv_invite_status` = `pending, consumed, expired`. The invite **list** on S8 = **Gap G7.** Issue takes only
-> `{ email, phone }` — the mock's `justification`/`issued_by` fields are UI-only.
+> `{ email, phone }` — the UI's `justification`/`issued_by` fields are UI-only.
 
 ### S9 — Audit log ❌
 No audit query endpoint exists. Entire screen is UI-composed. **Gap G8.**
@@ -198,7 +198,7 @@ No audit query endpoint exists. Entire screen is UI-composed. **Gap G8.**
 | read | `GET /investors/{id}` → `{ investor_id, status, aggregate_version }` |
 
 > `sub_type` ∈ `resident_individual, huf, nri, institutional` (only first two active). `fatca_status` enum is
-> `us_person, non_us_person, pending` — the mock's `not_us_person` is wrong → `non_us_person`.
+> `us_person, non_us_person, pending` — the UI's `not_us_person` is wrong → `non_us_person`.
 
 ### S11 — Listing marketplace ❌ (read gap) / ⚠️ (subscribe)
 - Marketplace **list of live listings** — no endpoint. **Gap G9.**
@@ -221,7 +221,7 @@ No audit query endpoint exists. Entire screen is UI-composed. **Gap G8.**
 
 > `tax_investor_statement_kind` = `monthly_portfolio, form_16a`. `sub_subscription_status` (for positions):
 > `committed, funds_pending, funds_received, confirmed, assignment_executed, distribution_received, closed,
-> cancelled_by_investor, refunded, loss_realised`. Mock's `distribution_outcome` object is UI-composed.
+> cancelled_by_investor, refunded, loss_realised`. UI's `distribution_outcome` object is UI-composed.
 
 ### S14 — Supplier portal ⚠️
 - Supplier identity: `GET /suppliers/{id}` (status + version only).
@@ -305,7 +305,7 @@ S15 read side) need backend read endpoints first. This register is the backlog f
 
 ## 5. How `mockData.js` is now organised
 
-To keep the mock a faithful stand-in for the API, each screen's data distinguishes:
+To keep the UI a faithful stand-in for the API, each screen's data distinguishes:
 
 - **API-shaped fixtures** — objects whose field names, enum values, and (for commands) envelope match the real
   endpoint exactly. These are the future live-swap targets.

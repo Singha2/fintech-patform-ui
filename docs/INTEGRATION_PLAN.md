@@ -4,7 +4,7 @@
 > `../fintech-platform-backend/docs/PROJECT_TRACKER.md`. This doc is the **UI-side executable detail** that
 > tracker points to — do the steps here, but record *progress* (which screen is wired) in the tracker.
 
-> **Audience: a Claude Code session.** This document is the build plan for wiring the React mock
+> **Audience: a Claude Code session.** This document is the build plan for wiring the React UI
 > (`fintech-patform-mock`) to the live Spring Boot backend (`fintech-platform-backend`, served under
 > `/api/v1`). It is organised into **phases → numbered steps**. Each step is independently reviewable and
 > testable and states its own **Files**, **Do**, **Backend contract**, **Test**, and **Acceptance**.
@@ -211,7 +211,7 @@ Goal: real OTP login, a stored bearer, and screens that can call authenticated e
 - **Files:** new `src/context/AuthContext.jsx`; wrap it in `src/App.jsx` **outside** `PersonaProvider`.
 - **Do:** hold `{ bearer, email, loginStep, challengeId }`. Actions: `beginLogin(email,password)`,
   `completeLogin(code)`, `logout()`. Persist `bearer`+`email` to `sessionStorage` (survives refresh, dies on tab
-  close — acceptable for a mock). Expose `useAuth()`. The API layer reads the bearer from here (inject via a
+  close — acceptable for a UI). Expose `useAuth()`. The API layer reads the bearer from here (inject via a
   `setActiveBearer()` the client reads, or pass explicitly from services — prefer a module-level
   `getBearer()`/`setBearer()` in `client.js` set by AuthContext on change).
 - **Contract:** in `mock` mode, AuthContext is a no-op shim (S1 can still call `onLogin` as today). In `live`
@@ -232,7 +232,7 @@ Goal: real OTP login, a stored bearer, and screens that can call authenticated e
     sidebar scope work, then navigate to the persona's first screen (existing `handleLogin` logic).
   - `mfa_failed` / `account_disabled` variants remain mock-only previews.
 - **Backend contract:** see Step 2.1. A disabled admin or bad password yields an `ApiError` — surface it inline
-  where the mock currently shows the red MFA error.
+  where the UI currently shows the red MFA error.
 - **Test [needs backend]:** log in as each of the 6 dev accounts; land on the correct first screen; a protected
   `GET /suppliers/{seeded}` succeeds with the stored bearer; a bad password shows an inline error.
 - **Acceptance:** real login works end-to-end for all 6 roles in live mode; mock mode login is unchanged.
@@ -319,7 +319,7 @@ below are the contract (all return the envelope unless noted; all reads return t
 
 ## PHASE 4 — Documents, KYC docs & invoice artifacts (BC16 / BC11 / BC1)
 
-Goal: real file upload + attach + download. This is the piece the mock has never had. **Read the three
+Goal: real file upload + attach + download. This is the piece the UI has never had. **Read the three
 controllers** (`DocumentController`, `KycDocumentController`, `InvoiceDocumentController`) before implementing.
 
 ### Step 4.1 — `documents.js` (BC16 generic two-phase upload)
@@ -574,7 +574,7 @@ Password for all admins: **`DevPass123!`**. OTP peek (dev): `GET /api/v1/dev/las
 | `ack@dev.local` | buyer ack user (OTP-only) | — (buyer portal, WS-2) | S15 |
 | `investor@dev.local` | investor identity | — (investor context, M10-full) | S10–S13 |
 
-The mock's composite `ops-treasury` persona has **no** live account (its steps split across `ops@` and
+The UI's composite `ops-treasury` persona has **no** live account (its steps split across `ops@` and
 `treasury@`/`treasury2@`); `auditor`/`investor`/`supplier`/`buyer` are not live-mapped this phase — see §1.4.
 
 Seed counterparty ids: `GET /api/v1/dev/seed-info` → `{supplier_id, buyer_id, investor_id, admins_password}`.

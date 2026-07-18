@@ -1,7 +1,7 @@
-# Fintech Platform — MVP Mock · CLAUDE.md
+# Fintech Platform — MVP UI · CLAUDE.md
 
 ## What this is
-A 15-screen interactive React mock of an **invoice-discounting platform**.
+A 15-screen interactive React **UI** for an **invoice-discounting platform**.
 No backend, no real auth — all data is hardcoded in `src/data/mockData.js`.
 Purpose: founder alignment by clicking, flow clarity, and seeding future API contracts.
 

@@ -1,4 +1,4 @@
-# Manual Test Plan — Fintech Platform Mock (mock-data mode)
+# Manual Test Plan — Fintech Platform UI (mock-data mode)
 
 > **Who this is for:** a developer or QA tester picking up the app for the first time, testing it **by clicking
 > through the browser** with the built-in mock data. **No backend, no setup beyond `npm`.** Follow the steps top
@@ -35,7 +35,7 @@ Open **http://localhost:5173** in your browser. If it loads a login screen, you'
 
 ## 2. Five things to know before you click
 
-These are the rules of the mock. Read them once — they explain most "is this a bug?" questions.
+These are the rules of the UI. Read them once — they explain most "is this a bug?" questions.
 
 | # | Fact | Why it matters when testing |
 |---|---|---|
@@ -125,7 +125,7 @@ Switch roles only with the top-bar "Viewing as" dropdown.
 disbursed (8), and got paid for (10) — the data followed you across all the screens.
 
 ⚠️ **Step 7 note on the investor identity:** the marketplace/portfolio always act as **Rahul Mehta**, not the
-investor you onboarded in step 4. That's a known mock limitation (see §8) — it does **not** make this test fail.
+investor you onboarded in step 4. That's a known UI limitation (see §8) — it does **not** make this test fail.
 
 ---
 
@@ -240,7 +240,7 @@ Please do **not** log these as defects:
 4. **Codes and passwords aren't validated** — any 6-digit code works; the password is cosmetic.
 5. **"Downloads" (statements / Form 16A / NOA) show a mock confirmation** instead of a real file.
 6. Some values the backend will compute (funding target, Virtual Account number, payout split, UTRs) are
-   **plausible fakes** in the mock.
+   **plausible fakes** in the UI.
 
 ---
 

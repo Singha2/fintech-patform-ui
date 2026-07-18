@@ -1,4 +1,4 @@
-# Decision Log — Fintech Platform Mock
+# Decision Log — Fintech Platform UI
 
 Tracks non-obvious decisions, bugs found during build, and their resolutions.
 Each entry: what changed, why, and what to watch for.

@@ -116,7 +116,7 @@ store (command wiring is a later increment).
 - Live mode still seeds from mock, so un-wired screens keep working; wired screens replace their collection on mount (graceful screen-by-screen flip).
 
 **Model-mapping sub-increment (built this pass):**
-- `src/store/mappers.js` — backend `deal_listing_status` → the mock's split invoice/listing statuses;
+- `src/store/mappers.js` — backend `deal_listing_status` → the UI's split invoice/listing statuses;
   `mapListingDetail(detail, opsChecks)` (BE-10 → `{listings, invoices, buyers, suppliers}` with the backend
   `listing_id` used as both invoice_id + listing_id, ops-checks → `check_outcomes`) and
   `mapSupplierListings(rows, supplierId)` (BE-11 → store invoices with a nested `listing`).
@@ -189,8 +189,8 @@ await service.transition(id, data, aggregate_version); await live.reload()   // 
     is the **logged-in dev account's** roles. So a full walk means **re-logging in** as `credit@`/`ops@` at the
     right steps; a step you lack the role for shows a 403 inline (correct). The seeded buyer is already `active`.
 
-**Findings baked in:** the mock's buyer lifecycle is *simplified* vs the backend — `activate` has real
-prerequisites (ack-user + payment instruction) the mock skipped; now modeled. Duplicate PAN/GSTIN/CIN and bad
+**Findings baked in:** the UI's buyer lifecycle is *simplified* vs the backend — `activate` has real
+prerequisites (ack-user + payment instruction) the UI skipped; now modeled. Duplicate PAN/GSTIN/CIN and bad
 IRN map to **500** (unhandled) rather than 4xx — a backend robustness gap (all 5 "Unhandled exception" log lines
 are from those test cases, none from real flows).
 
@@ -217,7 +217,7 @@ are from those test cases, none from real flows).
   check grid + list. buyer_ack routes to `record-buyer-ack`; "Send Ack Request" → `request-buyer-ack`. Verified
   (`s5-write.mjs`): create → start-ops-checks → record-ops-check **persisted** (irn_validity is a vendor check →
   recorded with **no outcome**, backend derives; `document_completeness` without an attached doc → **400 inline**).
-  *(The mock "invoice" IS the backend listing — invoice_id = listing_id.)*
+  *(The UI "invoice" IS the backend listing — invoice_id = listing_id.)*
 
 - [x] **S5 promote (snapshot-and-ready) + go-live** — "Send to Listing Approval →" runs
   `complete-ops-checks → request-buyer-ack → record-buyer-ack → snapshot-and-ready {rate_bps}` (OPS, version
@@ -261,7 +261,7 @@ the earlier manual `ops2` insert, no duplicate), `ops2@` login 200, e2e suites g
 
 **Per-screen shape caveats to handle as each is wired** (backend list reads are intentionally thin):
 BE-4 omits `agency_consent` (S3 Consent column blank live); BE-9 omits invite email/phone PII; BE-12
-work-queues are counts-only (no clickable per-item queue like the mock composes). These stay projection/blank
+work-queues are counts-only (no clickable per-item queue like the UI composes). These stay projection/blank
 until a richer read exists — flag, don't fake.
 
 ## After this increment

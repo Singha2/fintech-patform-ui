@@ -1,15 +1,15 @@
-# QA Test Journeys — Mock UI Walkthroughs
+# QA Test Journeys — UI Walkthroughs
 
-> **➡️ Testing the mock hands-on? Start with `MANUAL_TEST_PLAN.md`** — a step-by-step, junior-dev-friendly test
+> **➡️ Testing the UI hands-on? Start with `MANUAL_TEST_PLAN.md`** — a step-by-step, junior-dev-friendly test
 > plan (setup, smoke test, golden path, per-area test suites, sign-off). **This doc** is the deeper reference:
 > the five journeys as detailed click-paths, the edge-case variants, the backend command each step *represents*
 > (traceability to `API_ALIGNMENT.md`), and the **continuity gap register** (§7).
 >
-> **What the mock is and isn't.** This is a front-end-only mock (`CLAUDE.md`) — **no backend**. As of Tier 2 the
+> **What the UI is and isn't.** This is a front-end-only UI (`CLAUDE.md`) — **no backend**. As of Tier 2 the
 > screens **share one in-memory store** (`src/store/`, seeded from `src/data/mockData.js`), so an upstream action
 > (submit an invoice, go live, subscribe) now shows up on the downstream screen. A journey is walked partly by
 > clicking within a screen and partly by **switching persona** to reach the next actor's screen. A refresh resets
-> the store to its seed. A few cross-persona handoffs are still **simulated** in the mock (called out as
+> the store to its seed. A few cross-persona handoffs are still **simulated** in the UI (called out as
 > **⚙️ Simulated** below) rather than being real data continuity. Every such simulation and every known gap is
 > listed in **§7 Coverage & Gap Register** with its fix and status — the continuity gaps are now all closed
 > (Tier 2 P2–P4); §7 records what changed.
@@ -35,7 +35,7 @@ npm run dev      # http://localhost:5173
 - **Variant switcher:** most screens have pill buttons (top of the screen) that preview edge-case states
   (empty, rejected, suspended, etc.). Use them to test the unhappy paths noted per journey.
 
-**Legend:** ✅ real click action · ⚙️ Simulated (mock fakes a cross-actor step) · 🧪 variant to test ·
+**Legend:** ✅ real click action · ⚙️ Simulated (UI fakes a cross-actor step) · 🧪 variant to test ·
 🚨 known gap (see §7) · 🔗 maps to backend command.
 
 **Money = paise** (₹ = paise ÷ 100). **Rates = bps** (% = bps ÷ 100).
@@ -231,7 +231,7 @@ verification note below.)
 | 10 | Investor / **S13** | open the portfolio | the position shows **closed** with its **net** payout; summary counts it |
 
 **⚠️ One honest mock seam (identity, not data):** S12/S13 always act as a **fixed investor persona**
-(`inv-acct-001` "Rahul Mehta") because the mock has no investor login/identity switch. So the investor you
+(`inv-acct-001` "Rahul Mehta") because the UI has no investor login/identity switch. So the investor you
 onboard in step 4 is *not* the identity that commits in step 7 / views in step 10 — the commit shows up under
 `inv-acct-001`'s portfolio. The **store fully supports per-investor scoping** (the harness commits as the freshly
 onboarded investor and sees exactly their position); only the two investor *screens* pin the identity. This
@@ -264,7 +264,7 @@ submit, listing create + go-live, subscription commit, disburse, distribute). Al
 
 ## 7. Coverage & Gap Register (what to fix to make the flow continuous)
 
-Each gap = a place the mock does not carry the journey through. Severity: **S1** breaks the journey chain,
+Each gap = a place the UI does not carry the journey through. Severity: **S1** breaks the journey chain,
 **S2** = cosmetic/dead control, **S3** = data-continuity (upstream action not reflected downstream). **Status:
 Tier 1 fixes are applied** (build green); **Tier 2 shared-store continuity: P2 (onboarding) + P3 (listing) +
 P4 (money) done** — all five journeys now carry one entity end-to-end. Only P5 (one-entity walkthrough + docs) remains.
