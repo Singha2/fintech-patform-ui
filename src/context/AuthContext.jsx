@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { IS_LIVE } from '../config.js'
 import { setBearer } from '../api/client.js'
-import { loginPassword, verifyOtp, requestInvestorOtp, session as fetchSession } from '../api/services/auth.js'
+import { loginPassword, verifyOtp, requestInvestorOtp, session as fetchSession, logoutSession } from '../api/services/auth.js'
 
 const AuthCtx = createContext(null)
 export function useAuth() { return useContext(AuthCtx) }
@@ -62,11 +62,15 @@ export function AuthProvider({ children }) {
     return { token, session: s }
   }
 
+  // Clear local session immediately (instant UX), then revoke server-side with the captured bearer. Best-effort:
+  // a failed/absent /auth/logout (already-expired, or endpoint not yet shipped) still leaves the client logged out.
   function logout() {
+    const token = bearer
     setBearerState(null)
     setSession(null)
     setChallengeId(null)
     setLoginStep('credentials')
+    if (IS_LIVE && token) logoutSession(token).catch(() => { /* revoke is best-effort */ })
   }
 
   const value = { bearer, email, session, loginStep, challengeId, isAuthenticated: !!bearer, beginLogin, beginInvestorLogin, completeLogin, logout }

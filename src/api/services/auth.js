@@ -27,6 +27,14 @@ export async function session() {
   return data                                   // { kind, roles[], investor_id, admin_user_id, mfa_fresh, … }
 }
 
+// Server-side session revoke — terminates the bearer so it 401s on any later request (not just a local clear).
+// Pass the bearer explicitly so the caller can drop it from local state first. Best-effort: callers ignore failure
+// (an already-expired session, or a backend that hasn't exposed the endpoint yet — the revoke logic exists as
+// SessionService.revokeSession; awaiting the POST /auth/logout controller).
+export async function logoutSession(bearer) {
+  await request('POST', '/auth/logout', { bearer })
+}
+
 // Dev-only: read back the OTP the stub notifier just "sent", to pre-fill the code. Guarded to dev backend.
 export async function devLastOtp(email) {
   if (!IS_DEV_BACKEND) throw new Error('devLastOtp is available only against the dev backend')
