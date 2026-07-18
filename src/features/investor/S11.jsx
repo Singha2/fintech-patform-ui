@@ -20,7 +20,10 @@ function sectorColor(sector) {
 }
 
 function ListingCard({ listing, onClick, disabled }) {
-  const pct = fundingPct(listing.committed_total, listing.funding_target)
+  // Live marketplace read (BE-6) omits committed_total / names / sector — guard so nothing renders as NaN/blank.
+  const rawPct = fundingPct(listing.committed_total ?? 0, listing.funding_target)
+  const pct = Number.isFinite(rawPct) ? Math.max(0, Math.min(100, rawPct)) : 0
+  const title = listing.buyer_name || listing.invoice_number || 'Listing'
   return (
     <div
       onClick={disabled ? undefined : onClick}
@@ -32,13 +35,13 @@ function ListingCard({ listing, onClick, disabled }) {
     >
       <div className="flex items-start justify-between gap-2 mb-3">
         <div>
-          <p className="font-semibold text-gray-900 text-sm">{listing.buyer_name}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{listing.supplier_name}</p>
+          <p className="font-semibold text-gray-900 text-sm">{title}</p>
+          {listing.supplier_name && <p className="text-xs text-gray-500 mt-0.5">{listing.supplier_name}</p>}
         </div>
         <div className="flex gap-1.5 flex-wrap justify-end">
           <StatusBadge label={listing.status === 'live' ? 'Live' : 'Fully Funded'} color={listing.status === 'live' ? 'green' : 'gray'} />
           {listing.investor_subscribed && <StatusBadge label="Invested" color="purple" />}
-          <StatusBadge label={listing.buyer_sector} color={sectorColor(listing.buyer_sector)} />
+          {listing.buyer_sector && <StatusBadge label={listing.buyer_sector} color={sectorColor(listing.buyer_sector)} />}
         </div>
       </div>
 
