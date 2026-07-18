@@ -205,52 +205,57 @@ are from those test cases, none from real flows).
   - Same SoD reality as S4: re-login as `ops@`/`compliance@`/`credit@` at the right steps; a step you lack the
     role for shows 403 inline. The old step-only click-through wizard is replaced.
 
-- [~] **S6 Approve Disbursement** — wired: MFA → `settlement.disbursementApprove(listingId)`
-  (`POST /listings/{id}/disbursement/approve`, TREASURY, checker ≠ maker) → `reload()` → S7. Fixed the **read
-  mapping** too: `GET /disbursements` returns `{payout_instruction_id, listing_id, status, gross_amount,
-  net_amount, maker_id, checker_id, listing_status}` → mapped to the store's disbursement shape (names blank —
-  BE-7 returns ids; a drafted instruction implies the fully_funded ∧ all_signed gate). **Verification is limited:**
-  the approve needs a **drafted disbursement**, which needs a **fully_funded + all_signed** listing — i.e. the
-  whole deal pipeline. A pipeline harness drove create → ops-checks and confirmed each real prerequisite
-  (`document_completeness` needs an attached invoice doc; then buyer-ack → snapshot → go-live → subscribe → fund
-  → assignment-sign → draft → approve). Building that full setup is its own task. The approve command matches the
-  verified `DisbursementService` contract; E2E awaits a disbursable listing.
-  **Recommendation:** add a backend **dev helper** (like `/dev/seed-info`) that seeds a disbursable listing (or a
-  drafted disbursement), so S6/S7 money-flow writes become testable without hand-driving ~20 commands.
+- [x] **S6 Approve Disbursement** — MFA → `settlement.disbursementApprove(listingId)`
+  (`POST /listings/{id}/disbursement/approve`, TREASURY, checker ≠ maker) → `reload()` → S7. Read mapping:
+  `GET /disbursements` `{payout_instruction_id, listing_id, status, gross_amount, net_amount, maker_id, checker_id,
+  listing_status}` → store disbursement shape. **E2E-verified** (`moneyflow.mjs`, `/dev/seed-listing
+  {stage:"disbursable", maker:"treasury@"}`): a same-maker approve → **409 `checker_equals_maker`**; `treasury2@`
+  approve → **200**, listing flips `fully_funded → disbursed`, instruction `executed`.
 
 - [x] **S5 record-ops-check** (Pass/Fail buttons) — `POST /listings/{id}/record-ops-check {check_name, outcome}`
   (OPS, version threaded). The handler auto-runs `start-ops-checks` if the listing is `draft`, then refreshes the
   check grid + list. buyer_ack routes to `record-buyer-ack`; "Send Ack Request" → `request-buyer-ack`. Verified
   (`s5-write.mjs`): create → start-ops-checks → record-ops-check **persisted** (irn_validity is a vendor check →
-  backend derives `not_applicable`; `document_completeness` without an attached doc → **400 surfaced inline**).
+  recorded with **no outcome**, backend derives; `document_completeness` without an attached doc → **400 inline**).
   *(The mock "invoice" IS the backend listing — invoice_id = listing_id.)*
 
-- [~] **S5 promote (snapshot-and-ready) + go-live** — wired: "Send to Listing Approval →" runs
+- [x] **S5 promote (snapshot-and-ready) + go-live** — "Send to Listing Approval →" runs
   `complete-ops-checks → request-buyer-ack → record-buyer-ack → snapshot-and-ready {rate_bps}` (OPS, version
-  threaded); "Approve Go-Live" (MFA) → `approve-go-live` (TREASURY, checker ≠ maker). A full pipeline harness
-  (`golive.mjs`) verified create → start-ops-checks → **BC16 document upload** (initiate → PUT content → finalize →
-  attach) → 6/7 ops-checks. **Blocked at go-live E2E by a seed gap, not the wiring:** `document_completeness` is
-  **DOC.3 maker-checker** — attach (OPS) and record (OPS) must be *different* ops users, but the seed has only one
-  `ops_executive`. So the real path to `ready_for_review`/`live` is unsatisfiable with the current seed. The wiring
-  matches the verified `ListingService` contract; E2E needs the **dev seed helper** (`DEV_SEED_LISTING_HELPER.md`,
-  now updated to also seed `ops2@dev.local`).
+  threaded); "Approve Go-Live" (MFA) → `approve-go-live` (TREASURY, checker ≠ maker). **E2E-verified via the real
+  two-ops pipeline** (`s5golive.mjs`, now `ops2@dev.local` exists): create → start-ops-checks → **BC16 document
+  upload** (initiate → PUT → finalize → attach as `ops@`) → 7 ops-checks, where `document_completeness` by the
+  uploader is **rejected (DOC.3)** and by `ops2@` **accepted** → complete-ops-checks → buyer-ack → snapshot-and-ready
+  → **`ready_for_review`** → ops (maker) go-live **403** → `treasury@` approve → **`live` + VA**. 22/22 green.
+  ⚠️ **UI gap:** the invoice-document upload (BC16, kind `invoice`) has **no UI** yet, so `document_completeness`
+  can't be satisfied from the screen in live mode — a small upload+attach flow (or an ops2 re-login step) is the
+  remaining feature.
 
-- [~] **S12 subscribe** — `POST /listings/{id}/subscriptions/commit {investor_id, amount_paise}` (ops-on-behalf,
-  OPS) → refresh. **Live caveat:** `investor_id` must be a real backend id — `INVESTOR.id` is the mock placeholder
-  (ties to the deferred investor-login + the dev seed helper, which returns a real investor_id).
-- [~] **S7 record-maturity + distribution** — `POST …/record-maturity {amount_paise, utr}` (TREASURY); "Execute
-  Distributions" → `distribution/draft` (maker) → `distribution/approve` (checker ≠ maker — needs a **second
-  treasury** login). Reconciliation stays local (G6 — no read endpoint); S7's distribution *read* has no list
-  endpoint, so its list stays projection.
+- [x] **S12 subscribe** — `POST /listings/{id}/subscriptions/commit {investor_id, amount_paise}` (ops-on-behalf,
+  OPS) → refresh. **E2E-verified** (`moneyflow.mjs`, `stage:"live"`): commit → `committed_total` increments by the
+  amount. `investor_id` now resolved from `/dev/seed-info` in **live+dev** (`resolveInvestorId()`); `INVESTOR.id`
+  stays the mock-mode placeholder. Production sourcing (the logged-in investor's own id) arrives with **BE-18**.
 
-**All wired ✅ where drivable; the deal-flow writes (S5 go-live, S6 approve, S7 maturity/distribution, S12
-subscribe) are wired to verified contracts but E2E-blocked** on the deal pipeline + seed gaps (DOC.3 two-ops,
-disbursable listing, real investor_id) — unblocked by the backend **`DEV_SEED_LISTING_HELPER`** (specced, adds
-`ops2@dev.local` + stage seeding). No-endpoint writes (revokeInvite, buyer self-ack) stay mock.
+- [x] **S7 record-maturity + distribution** — **record-maturity is OPS, not Treasury** (`POST …/record-maturity
+  {amount_paise, utr}`); `amount_paise` must equal the invoice **face value** (full buyer repayment; under-payment
+  → shortfall/M14). Distribution is maker-checker: **`draftDistribution` (Treasury maker)** and
+  **`approveDistribution` (Treasury checker ≠ maker)** are now **two separate buttons** — the old single "Execute
+  Distributions" bundled both with one bearer and could never complete (same-user approve rejected). **E2E-verified**
+  (`moneyflow.mjs`): record-maturity as `treasury@` → **403 `role_not_held`**, as `ops@` → **200** (→ `matured`);
+  `treasury@` draft → **201**, `treasury2@` approve → **200** (deal `closed`, `terminal_outcome=distributed`).
+  Reconciliation stays local (G6); the distribution list stays projection (no list endpoint).
 
-**Write-wiring is functionally complete on the front-end** — every write button that has a backend command now
-calls it directly (no fallback), with version threading + inline errors. What remains is backend-side (the dev
-seeder) to make the deal-flow writes E2E-verifiable.
+**All four deal-flow writes are now E2E-verified against the live backend** using `/dev/seed-listing` (DL-BE-086):
+S5 go-live, S6 approve, S7 maturity/distribution, S12 subscribe. No-endpoint writes (revokeInvite, buyer self-ack)
+stay mock.
+
+⚠️ **Backend/env caveat (ops2 materialization).** `DevDataSeeder` is empty-guarded (seeds only when `admin_user`
+is empty), so DL-BE-086's new `ops2@dev.local` does **not** appear on any pre-existing dev DB — the running dev DB
+had 6 admins and the seeder skipped. Verifying S5 go-live required inserting `ops2` manually (mirroring
+`seedAdmin`, cloning `ops@`'s Argon2id hash). **Backend follow-up:** make the seeder upsert missing admin accounts
+(or add a `/dev/ensure-admins` helper) so a full DB wipe isn't needed to pick up new seed accounts.
+
+**Write-wiring is complete and E2E-verified** — every write button that has a backend command calls it directly
+(no fallback), with version threading + inline errors. Remaining front-end feature: the S5 invoice-document upload UI.
 
 **Per-screen shape caveats to handle as each is wired** (backend list reads are intentionally thin):
 BE-4 omits `agency_consent` (S3 Consent column blank live); BE-9 omits invite email/phone PII; BE-12

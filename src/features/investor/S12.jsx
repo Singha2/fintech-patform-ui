@@ -7,8 +7,9 @@ import PageHeader from '../../components/kit/PageHeader.jsx'
 import StatusBadge from '../../components/kit/StatusBadge.jsx'
 import { formatPaise, formatRupees, formatRate, formatDate, formatDatetime, fundingPct } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
-import { subscriptions as subscriptionsSvc } from '../../api/services/index.js'
+import { subscriptions as subscriptionsSvc, investors as investorsSvc } from '../../api/services/index.js'
 import { describe } from '../../api/errors.js'
+import { IS_LIVE, IS_DEV_BACKEND } from '../../config.js'
 import { useStore } from '../../store/PlatformStore.jsx'
 import { useHydrate } from '../../store/useHydrate.js'
 
@@ -74,14 +75,20 @@ export default function S12() {
   const pct = fundingPct(committedTotal, fundingTarget)
 
   // 🔗 POST /listings/{id}/subscriptions/commit {investor_id, amount_paise} — ops-on-behalf (OPS role; investor
-  // self-commit is BE-18). NOTE for live: investor_id must be a REAL backend id — INVESTOR.id is the mock
-  // placeholder (ties to the deferred investor-login + the dev seed helper, which returns a real investor_id).
+  // self-commit is BE-18). investor_id must be a REAL backend id: in live+dev we resolve the seeded active
+  // investor from /dev/seed-info; INVESTOR.id is the mock-mode placeholder. BE-18 (investor login) replaces this
+  // with the logged-in investor's own id.
+  async function resolveInvestorId() {
+    if (IS_LIVE && IS_DEV_BACKEND) return (await investorsSvc.devSeedInfo())?.investor_id ?? INVESTOR.id
+    return INVESTOR.id
+  }
   async function handleCommit() {
     if (amtNum < 10000) { setAmountErr('Minimum investment is ₹10,000 (DL-007).'); return }
     if (committedTotal + amtNum * 100 > fundingTarget) { setAmountErr('Amount exceeds remaining headroom (G10/L.2).'); return }
     setAmountErr('')
     try {
-      const env = await subscriptionsSvc.commit(listingId, { investor_id: INVESTOR.id, amount_paise: amtNum * 100 })
+      const investor_id = await resolveInvestorId()
+      const env = await subscriptionsSvc.commit(listingId, { investor_id, amount_paise: amtNum * 100 })
       await live.reload()
       setSubscription({ subscription_id: env?.aggregate_id ?? 'sub-new', amount: amtNum * 100, status: 'committed' })
       setVariant('committed')

@@ -30,20 +30,26 @@ export default function S7() {
     setRecon(prev => prev.map(r => (r.rec_id === recId ? { ...r, status: 'shortfall_raised' } : r)))
   }
 
-  // 🔗 POST /listings/{id}/record-maturity {amount_paise, utr} (TREASURY).
+  // 🔗 POST /listings/{id}/record-maturity {amount_paise, utr} — OPS role (not Treasury). amount_paise must equal
+  // the invoice FACE value (full buyer repayment); an under-payment is a maturity shortfall (M14). Ops records it;
+  // a Treasury user on this screen will see a 403 (role_not_held) surfaced inline and must re-login as Ops.
   async function recordMaturity(listingId, amountPaise) {
     setErr(''); setBusy(true)
     try { await settlementSvc.recordMaturity(listingId, { amount_paise: amountPaise, utr: `UTR${Date.now()}` }) }
     catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
-  // 🔗 distribution/draft (maker) → distribution/approve (checker ≠ maker). Needs TWO treasury users — a same-user
-  // approve is rejected (checker = maker), so a full run means re-logging as the second treasury account.
-  async function executeDistribution(listingId) {
+  // 🔗 distribution is maker-checker (C4): draft (TREASURY maker) and approve (TREASURY checker ≠ maker) are TWO
+  // SEPARATE actions by two treasury users. A same-user approve is rejected (checker = maker), so approving means
+  // re-logging as the second treasury account. Bundling both in one handler can never complete — kept split.
+  async function draftDistribution(listingId) {
     setErr(''); setBusy(true)
-    try {
-      await distributionTaxSvc.distributionDraft(listingId)
-      await distributionTaxSvc.distributionApprove(listingId)
-    } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+    try { await distributionTaxSvc.distributionDraft(listingId) }
+    catch (e) { setErr(describe(e)) } finally { setBusy(false) }
+  }
+  async function approveDistribution(listingId) {
+    setErr(''); setBusy(true)
+    try { await distributionTaxSvc.distributionApprove(listingId) }
+    catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 
   const distColumns = [
@@ -141,9 +147,13 @@ export default function S7() {
                     <p className="text-xs text-gray-400 mt-2">C23: buyer repayment must be recorded before distribution executes.</p>
                   </div>
                 ) : (
-                  <Button className="mt-4" disabled={busy} onClick={() => executeDistribution(selDist.listing_id)}>
-                    {busy ? 'Executing…' : 'Execute Distributions (T+1 · DL-030)'}
-                  </Button>
+                  <div className="mt-4 flex flex-col gap-2">
+                    <div className="flex gap-2">
+                      <Button disabled={busy} onClick={() => draftDistribution(selDist.listing_id)}>{busy ? 'Working…' : 'Draft Distribution (maker)'}</Button>
+                      <Button variant="ghost" disabled={busy} onClick={() => approveDistribution(selDist.listing_id)}>Approve (checker ≠ maker)</Button>
+                    </div>
+                    <p className="text-xs text-gray-400">Maker-checker (C4): draft as one Treasury user, then approve as a second (re-login). T+1 · DL-030.</p>
+                  </div>
                 )}
                 {err && <p className="text-xs text-red-600 mt-3">Failed: {err}</p>}
               </Card>
