@@ -80,11 +80,13 @@ Login → **S2** dashboard → one **supplier onboarding (S3)** → **go-live (S
 
 ---
 
-## 6. Investor self-service — **TO BE ADDED after BE-18**
-> _Placeholder — Amit to fill in once `BE18_INVESTOR_LOGIN_SELFCOMMIT_BRIEF.md` ships._
-> Today the investor portal is **read-only**: S10/S12 are ops-on-behalf and S13 uses a dev bearer. After BE-18,
-> add the **passwordless investor login** (email + OTP) and **investor self-commit** (the investor subscribes as
-> themselves) steps here.
+## 6. Investor self-service (BE-18 — live)
+A real investor logs in with **email + OTP (no password)** and subscribes **as themselves**.
+- [ ] **Investor login:** on the login screen click **"Investor? Log in with email + OTP →"** → email `investor@dev.local` → **Send OTP** (auto-fills in dev) → **Verify & Enter** → lands on **S11 (marketplace)**.
+- [ ] **Self-subscribe (S12):** open a live listing → enter an amount → **Commit** → committed total rises; the position appears in **S13** (My Portfolio) — no Ops involved.
+- [ ] **Scoping (optional):** the investor only ever sees their **own** portfolio (backend rejects any cross-account read/commit → 403).
+
+_Ops-on-behalf still works: an admin can also subscribe for an investor from S12 — no change to the admin flow._
 
 ---
 
