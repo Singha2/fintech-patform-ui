@@ -4,7 +4,7 @@ import Card from '../../components/kit/Card.jsx'
 import FormField from '../../components/kit/FormField.jsx'
 import mockData from '../../data/mockData.js'
 import { IS_LIVE, IS_DEV_BACKEND } from '../../config.js'
-import { LIVE_LOGIN_PERSONA_MAP } from '../../routes.js'
+import { personaFromSession } from '../../routes.js'
 import { useAuth } from '../../context/AuthContext.jsx'
 import { devLastOtp } from '../../api/services/auth.js'
 import { describe } from '../../api/errors.js'
@@ -69,10 +69,7 @@ function LiveLogin({ onLogin }) {
     setErr(''); setBusy(true)
     try {
       const { session } = await completeLogin(otp.trim())
-      const personaId = session?.kind === 'investor'
-        ? 'investor'
-        : (LIVE_LOGIN_PERSONA_MAP[email.trim().toLowerCase()] ?? 'ops-executive')
-      onLogin(personaId)                           // advisory persona — backend enforces the real authz
+      onLogin(personaFromSession(session))         // persona from the session's roles/kind — backend enforces real authz
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
 

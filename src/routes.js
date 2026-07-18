@@ -80,11 +80,26 @@ export const LOGIN_PERSONA_MAP = {
 // LIVE login: seeded dev-account email → UI persona. Backend role = UI persona, exactly 1:1
 // (canonical mapping: mock docs/API_ALIGNMENT.md §1.4). The other 5 personas are intentionally not live-mapped.
 // Persona is advisory (UI nav/sidebar scope only) — the backend enforces authz from the bearer's real roles.
-export const LIVE_LOGIN_PERSONA_MAP = {
-  'super@dev.local':      'super-admin',
-  'ops@dev.local':        'ops-executive',
-  'credit@dev.local':     'credit-reviewer',
-  'compliance@dev.local': 'compliance-reviewer',
-  'treasury@dev.local':   'treasury-settlement',
-  'treasury2@dev.local':  'treasury-settlement',
+// Derive the UI persona (sidebar/nav grouping) from the live session — NOT from the email. The backend is the
+// source of truth for identity: `GET /auth/session` returns `kind` + `roles[]`, so any email/account works.
+// Persona is advisory (which screens are shown); the backend enforces the real authz (role gates + own-id/tenant
+// scoping) from the bearer. Backend role strings ↔ UI persona ids:
+//   super_admin→super-admin · ops_executive→ops-executive · credit_reviewer→credit-reviewer
+//   compliance_reviewer→compliance-reviewer · treasury_and_settlement→treasury-settlement · auditor→auditor (M17)
+// kind investor→investor · acknowledgment_user→buyer. A multi-role admin resolves to the broadest fit
+// (ops+treasury→ops-treasury); edge cases can still be switched via the "Viewing as" dropdown.
+export function personaFromSession(session) {
+  if (!session) return 'ops-executive'                              // nav-only fallback (backend still enforces authz)
+  if (session.kind === 'investor') return 'investor'
+  if (session.kind === 'acknowledgment_user') return 'buyer'
+  const roles = session.roles ?? []
+  const has = r => roles.includes(r)
+  if (has('super_admin')) return 'super-admin'
+  if (has('auditor')) return 'auditor'                              // forward-compatible (M17 not built yet)
+  if (has('ops_executive') && has('treasury_and_settlement')) return 'ops-treasury'
+  if (has('compliance_reviewer')) return 'compliance-reviewer'
+  if (has('credit_reviewer')) return 'credit-reviewer'
+  if (has('treasury_and_settlement')) return 'treasury-settlement'
+  if (has('ops_executive')) return 'ops-executive'
+  return 'ops-executive'
 }
