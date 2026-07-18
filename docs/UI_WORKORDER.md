@@ -292,3 +292,23 @@ The backend now supports a genuine self-service investor (no dev password, no op
 Suggested E2E harness `scripts/e2e/investor-self-commit.mjs` (mirror `investor-onboarding.mjs`): passwordless login → self-commit on a `/dev/seed-listing {stage:"live"}` listing → assert own subscription persists + a cross-tenant `investor_id` is rejected. Reads: `API_CATALOGUE.md` (new `/auth/login/investor/request-otp` row + updated commit role-line), backend `docs/modules/M11-B-investor-login-selfcommit.md`.
 
 _Note: `request-otp` has no dedicated rate-limiter yet (deferred to platform-wide auth-hardening) — fine for pilot, flagged before public scale._
+
+---
+
+## BE-15 handoff — buyer portal S15 (backend SHIPPED, DL-BE-090)
+
+The last screen. Backend now supports a real self-service buyer ack-user (passwordless login + own-scoped reads + self-ack). Wire S15 like the investor portal — its OTP screen, reads, and Acknowledge button all have live endpoints now:
+
+- **Ack-user login** — add a passwordless path in `AuthContext` (mirror `beginInvestorLogin`): `POST /auth/login/ack-user/request-otp {email}` → `{challenge_id}` → `POST /auth/login/verify-otp {challenge_id, code}` → bearer. S15's OTP screen calls it. Session `kind='acknowledgment_user'`; `GET /auth/session` now carries the ack-user's `buyer_id`. Enumeration-safe (unknown/ineligible email → same `{challenge_id}` shape, no OTP) — show one generic "check your code" on verify failure. Only an **active** ack-user of an **active** buyer can log in.
+
+- **Reads** — replace `mockData.S15` with, scoped to `/auth/session`'s own `buyer_id`: `GET /buyers/{buyerId}/ack-invoices` → `[{listing_id, invoice_number, supplier_name, face_value_paise, invoice_date, due_date, ack_status, sla_hours, requested_at, acknowledged_at, aggregate_version}]` (listings awaiting acknowledgment); and `GET /buyers/{buyerId}/payment-instruction` → `{present, effective_from, confirmed_at}`. A mismatched buyer id → 403 `cross_tenant_read`.
+
+  - **Note on payment-instruction:** metadata only — **no bank/account/IFSC fields**. Backend `confirm-PI` currently stores a placeholder, not real remittance details, so the portal can show "payment instruction confirmed (effective X)" but not the account to pay into. Surfacing real details is a separate upstream backend follow-up (enhance `confirm-PI`). Don't build UI expecting structured bank fields yet.
+
+- **Self-ack** — the Acknowledge button calls `POST /listings/{listingId}/record-buyer-ack` under the ack-user session with `{outcome:"acknowledged"}` (+ `X-Command-Id`, `X-Aggregate-Version` from the invoice's `aggregate_version`). No `investor_id`/`buyer_id` in the body — derived from the session. Only `acknowledged` is allowed for a buyer (failure stays ops); the listing must have an outstanding ops request (`ack_status='requested'`); a second ack is rejected. Drop the store's `acknowledgeInvoice` stub.
+
+- **Logout** — S15's Log out gains a real server revoke (`POST /auth/logout`, DL-BE-089) once it holds a bearer.
+
+Suggested E2E `scripts/e2e/buyer-portal.mjs` (mirror `investor-self-commit.mjs`): ack-user login → read own ack-invoices → self-ack a `requested` listing → assert `captured_by_kind='buyer_ack_user'` persisted + a cross-buyer read/ack is rejected. Reads: `API_CATALOGUE.md` (new rows), backend `docs/modules/M11-C-buyer-portal-ack.md`.
+
+Net: **S15 flips from mock to live** — the deal flow's buyer-ack control gets real buyer provenance, and every S1–S15 screen (bar S9, awaiting M17) is wired.

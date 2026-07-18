@@ -17,4 +17,7 @@ export const buyers = {
   get:    (id) => readById(`${base}/${id}`),                                            // {buyer_id,status,aggregate_version}
   list:   ()   => readById(base),                                                       // BE-5 (S4)
   getKyb: (id) => readById(`${base}/${id}/kyb-verification`),                           // {kyb_verified,kyb_verified_by,kyb_verified_at,kyb_document_id}
+  // ── buyer portal reads (BE-15, S15) — own-scoped for an ack-user; mismatch → 403 cross_tenant_read ──
+  ackInvoices:        (id) => readById(`${base}/${id}/ack-invoices`),                   // [{listing_id,invoice_number,supplier_name,face_value_paise,invoice_date,due_date,ack_status,sla_hours,requested_at,acknowledged_at}]
+  paymentInstruction: (id) => readById(`${base}/${id}/payment-instruction`),            // {present,effective_from?,confirmed_at?} (metadata only — bank fields not yet captured)
 }

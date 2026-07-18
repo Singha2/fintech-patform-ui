@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { IS_LIVE } from '../config.js'
 import { setBearer } from '../api/client.js'
-import { loginPassword, verifyOtp, requestInvestorOtp, session as fetchSession, logoutSession } from '../api/services/auth.js'
+import { loginPassword, verifyOtp, requestInvestorOtp, requestAckUserOtp, session as fetchSession, logoutSession } from '../api/services/auth.js'
 
 const AuthCtx = createContext(null)
 export function useAuth() { return useContext(AuthCtx) }
@@ -50,6 +50,15 @@ export function AuthProvider({ children }) {
     return challenge_id
   }
 
+  // Passwordless buyer ack-user login (BE-15): email → OTP, no password.
+  async function beginAckUserLogin(inputEmail) {
+    const { challenge_id } = await requestAckUserOtp(inputEmail)
+    setEmail(inputEmail)
+    setChallengeId(challenge_id)
+    setLoginStep('mfa')
+    return challenge_id
+  }
+
   async function completeLogin(code) {
     const { bearer: token } = await verifyOtp(challengeId, code)
     setBearer(token)                              // set on the client before reading /auth/session
@@ -73,6 +82,6 @@ export function AuthProvider({ children }) {
     if (IS_LIVE && token) logoutSession(token).catch(() => { /* revoke is best-effort */ })
   }
 
-  const value = { bearer, email, session, loginStep, challengeId, isAuthenticated: !!bearer, beginLogin, beginInvestorLogin, completeLogin, logout }
+  const value = { bearer, email, session, loginStep, challengeId, isAuthenticated: !!bearer, beginLogin, beginInvestorLogin, beginAckUserLogin, completeLogin, logout }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }

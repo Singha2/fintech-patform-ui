@@ -16,6 +16,13 @@ export async function requestInvestorOtp(email) {
   return data                                   // { challenge_id }
 }
 
+// Passwordless buyer ack-user login (BE-15): email → OTP for an active acknowledgment_user → challenge_id, then
+// verifyOtp. Enumeration-safe, same as the investor path.
+export async function requestAckUserOtp(email) {
+  const { data } = await request('POST', '/auth/login/ack-user/request-otp', { body: { email } })
+  return data                                   // { challenge_id }
+}
+
 export async function verifyOtp(challengeId, code) {
   const { data } = await request('POST', '/auth/login/verify-otp', { body: { challenge_id: challengeId, code } })
   return data                                   // { bearer }
