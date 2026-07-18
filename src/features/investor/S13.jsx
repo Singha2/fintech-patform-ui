@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Button from '../../components/kit/Button.jsx'
 import Card from '../../components/kit/Card.jsx'
@@ -8,8 +8,11 @@ import Table from '../../components/kit/Table.jsx'
 import { formatPaise, formatDate } from '../../utils/format.js'
 import mockData from '../../data/mockData.js'
 import { useStore } from '../../store/PlatformStore.jsx'
+import { investors as investorsSvc, distributionTax as taxSvc } from '../../api/services/index.js'
+import { session as authSession } from '../../api/services/auth.js'
+import { IS_LIVE, IS_DEV_BACKEND } from '../../config.js'
 
-// The investor persona whose positions this portfolio shows (matches S12 commits).
+// The investor persona whose positions this portfolio shows (matches S12 commits) — mock-mode only.
 const INVESTOR = { id: 'inv-acct-001', name: 'Rahul Mehta' }
 
 const VARIANTS = [
@@ -20,11 +23,13 @@ const VARIANTS = [
 ]
 
 const SUB_STATUS_COLOR = {
-  committed:           'amber',
-  funds_pending:       'amber',
-  confirmed:           'amber',
-  assignment_executed: 'purple',
-  closed:              'green',
+  committed:            'amber',
+  funds_pending:        'amber',
+  confirmed:            'amber',
+  assignment_executed:  'purple',
+  distribution_received:'green',
+  closed:               'green',
+  refunded:             'gray',
 }
 
 export default function S13() {
@@ -32,28 +37,59 @@ export default function S13() {
   const [variant, setVariant] = useState('normal')
   const [accountOpen, setAccountOpen] = useState(false)
   const [downloadMsg, setDownloadMsg] = useState('')
-  // Positions + summary come from the store (P4 — reflect S12 commits and S7 distribution outcomes: G-E4);
-  // account details, TDS ledger, and statements stay from mockData (backed by their own endpoints).
+  // Mock mode: positions + summary come from the store (P4 — reflect S12 commits and S7 outcomes); TDS + statements
+  // from mockData. Live mode: one call GET /investors/{id}/subscriptions → {rows, summary} (BE-17) + the tax reads.
   const { investorPortfolio, investorSummary } = useStore()
   const { investor, tds, statements } = mockData.S13
-  const subscriptions = investorPortfolio(INVESTOR.id)
-  const summary = investorSummary(INVESTOR.id)
+  const [live, setLive] = useState(null)          // { rows, summary, tds, statements } in live mode
+  const [loading, setLoading] = useState(IS_LIVE)
+  const [liveErr, setLiveErr] = useState('')
 
-  function mockDownload(name) {  // 🔗 GET …/tax/form-16a/{fy} · GET …/tax/statements (mock stand-in)
+  // Live: scope reads to the session's own investor_id (BE-17); in dev, an admin bearer falls back to the seeded
+  // investor (admin may read any investor). Real investor login is dev-password today; unchanged for BE-18.
+  useEffect(() => {
+    if (!IS_LIVE) return
+    let alive = true
+    ;(async () => {
+      setLoading(true); setLiveErr('')
+      try {
+        let id = null
+        try { const s = await authSession(); if (s?.kind === 'investor') id = s.investor_id } catch { /* not an investor session */ }
+        if (!id && IS_DEV_BACKEND) id = (await investorsSvc.devSeedInfo())?.investor_id
+        if (!id) throw new Error('No investor session — log in as an investor to view a portfolio.')
+        const [port, ded, stm] = await Promise.all([
+          investorsSvc.subscriptions(id),
+          taxSvc.deductions(id).catch(() => []),
+          taxSvc.statements(id).catch(() => []),
+        ])
+        if (alive) setLive({ rows: port?.rows ?? [], summary: port?.summary ?? {}, tds: ded ?? [], statements: stm ?? [] })
+      } catch (e) { if (alive) setLiveErr(e?.message || String(e)) }
+      finally { if (alive) setLoading(false) }
+    })()
+    return () => { alive = false }
+  }, [])
+
+  const subscriptions = IS_LIVE ? (live?.rows ?? []) : investorPortfolio(INVESTOR.id)
+  const summary       = IS_LIVE ? (live?.summary ?? {}) : investorSummary(INVESTOR.id)
+  const tdsRows       = IS_LIVE ? (live?.tds ?? []) : tds
+  const statementRows = IS_LIVE ? (live?.statements ?? []) : statements
+
+  function mockDownload(name) {  // 🔗 GET …/tax/form-16a/{fy} · GET …/tax/statements (mock stand-in; live binary download pending)
     setDownloadMsg(`${name} downloaded (mock)`)
     setTimeout(() => setDownloadMsg(''), 4000)
   }
 
-  const isEmpty = variant === 'empty_portfolio'
-  const isKycDue = variant === 'kyc_refresh_due'
-  const isSuspended = variant === 'investor_suspended'
+  // Live: empty is derived from real rows; the mismatch/kyc/suspended states are mock-only preview variants.
+  const isEmpty = IS_LIVE ? (!loading && subscriptions.length === 0) : variant === 'empty_portfolio'
+  const isKycDue = !IS_LIVE && variant === 'kyc_refresh_due'
+  const isSuspended = !IS_LIVE && variant === 'investor_suspended'
 
   // Summary card definitions
   const summaryCards = [
-    { label: 'Total Deployed',   value: formatPaise(summary.total_deployed_paise) },
-    { label: 'Total Returned',   value: formatPaise(summary.total_returned_paise) },
-    { label: 'Active Positions', value: summary.active_positions },
-    { label: 'Matured',          value: summary.matured_positions },
+    { label: 'Total Deployed',   value: formatPaise(summary.total_deployed_paise ?? 0) },
+    { label: 'Total Returned',   value: formatPaise(summary.total_returned_paise ?? 0) },
+    { label: 'Active Positions', value: summary.active_positions ?? 0 },
+    { label: 'Matured',          value: summary.matured_positions ?? 0 },
   ]
 
   // Positions table columns with custom renderers
@@ -105,7 +141,7 @@ export default function S13() {
   // TDS table columns
   const tdsColumns = [
     { key: 'fy_code',           label: 'FY' },
-    { key: 'buyer',             label: 'Buyer',       render: row => row.buyer_name },
+    { key: 'buyer',             label: 'Buyer',       render: row => row.buyer_name ?? (row.listing_id ? `${row.listing_id.slice(0, 8)}…` : '—') },
     { key: 'gross_paise',       label: 'Gross (₹)',   render: row => formatPaise(row.gross_paise) },
     { key: 'tds_amount_paise',  label: 'TDS (₹)',     render: row => formatPaise(row.tds_amount_paise) },
     { key: 'fee_paise',         label: 'Fee (₹)',     render: row => formatPaise(row.fee_paise) },
@@ -134,16 +170,22 @@ export default function S13() {
         <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-800">✓ {downloadMsg}</div>
       )}
 
-      {/* Variant switcher */}
-      <div className="flex items-center gap-2 flex-wrap mb-6">
-        <span className="text-xs text-gray-400">Preview state:</span>
-        {VARIANTS.map(v => (
-          <button key={v.id} onClick={() => setVariant(v.id)}
-            className={`px-3 py-1 text-xs rounded-full border transition-colors ${variant === v.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>
-            {v.label}
-          </button>
-        ))}
-      </div>
+      {/* Live status */}
+      {IS_LIVE && loading && <p className="text-xs text-gray-400 mb-4">Loading portfolio…</p>}
+      {IS_LIVE && liveErr && <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700">Live load failed: {liveErr}</div>}
+
+      {/* Variant switcher — mock-mode preview states only */}
+      {!IS_LIVE && (
+        <div className="flex items-center gap-2 flex-wrap mb-6">
+          <span className="text-xs text-gray-400">Preview state:</span>
+          {VARIANTS.map(v => (
+            <button key={v.id} onClick={() => setVariant(v.id)}
+              className={`px-3 py-1 text-xs rounded-full border transition-colors ${variant === v.id ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-500 border-gray-300 hover:border-indigo-400'}`}>
+              {v.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* KYC refresh banner */}
       {isKycDue && (
@@ -195,17 +237,18 @@ export default function S13() {
           {/* TDS section */}
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-gray-700 mb-3">TDS Deductions</h2>
-            <Table columns={tdsColumns} rows={tds} />
+            <Table columns={tdsColumns} rows={tdsRows} />
           </div>
 
           {/* Statements section */}
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-gray-700 mb-3">Statements</h2>
-            <Table columns={statementColumns} rows={statements} />
+            <Table columns={statementColumns} rows={statementRows} />
             {/* TBD: Form 16A download from screen directly or emailed only? */}
           </div>
 
-          {/* Account details (collapsible) */}
+          {/* Account details (collapsible) — mock-mode only (no live PII read wired here) */}
+          {!IS_LIVE && (
           <div className="mb-4">
             <button
               onClick={() => setAccountOpen(o => !o)}
@@ -225,6 +268,7 @@ export default function S13() {
               </Card>
             )}
           </div>
+          )}
         </>
       )}
 

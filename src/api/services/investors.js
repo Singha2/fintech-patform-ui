@@ -21,6 +21,7 @@ export const investors = {
   get:         (id) => readById(`${base}/${id}`),                                       // {investor_id,status,aggregate_version}
   listInvites: (status) => readById(`/investor-invites${status ? `?status=${status}` : ''}`), // BE-9 (S8)
   kycFile:     (id) => readById(`${base}/${id}/kyc-file`),                              // BE-2
+  subscriptions: (id) => readById(`${base}/${id}/subscriptions`),                       // BE-17 portfolio {rows, summary} (S13)
   // Dev-only: the seeded active investor's real id, for ops-on-behalf commit (S12) until investor self-login (BE-18).
   devSeedInfo: () => readById('/dev/seed-info'),                                        // {supplier_id,buyer_id,investor_id}
 }

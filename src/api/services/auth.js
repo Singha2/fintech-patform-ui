@@ -14,6 +14,12 @@ export async function verifyOtp(challengeId, code) {
   return data                                   // { bearer }
 }
 
+// Who-am-I (BE-1): the current session's identity + scope. Drives investor-scoped reads (S13) + role-nav.
+export async function session() {
+  const { data } = await request('GET', '/auth/session')
+  return data                                   // { kind, roles[], investor_id, admin_user_id, mfa_fresh, … }
+}
+
 // Dev-only: read back the OTP the stub notifier just "sent", to pre-fill the code. Guarded to dev backend.
 export async function devLastOtp(email) {
   if (!IS_DEV_BACKEND) throw new Error('devLastOtp is available only against the dev backend')
