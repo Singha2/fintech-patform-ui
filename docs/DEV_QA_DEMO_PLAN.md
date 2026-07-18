@@ -26,9 +26,11 @@ Dev **admins** log in with password **`DevPass123!`**; the **investor** and **bu
 
 ## 2. Two things to know
 
-- **"Viewing as" dropdown** (top bar) = which **screens** you see.
-- **The account you logged in as** = what you're allowed to **do**. A **403** means wrong role → click **Log out**
-  (top bar) and log in as the account the step names. The logged-in email shows next to the button.
+- **The sidebar shows your role's screens** — in live mode there's **no "Viewing as" switcher**; nav is driven
+  straight from the account's backend roles (the top bar shows your role + email). *(The persona switcher exists
+  only in offline mock mode.)*
+- **The account you logged in as** = what you can see **and** do. A **403** means wrong role → click **Log out**
+  (top bar) and log in as the account the step names. To act as a different principal, log out and log back in.
 
 | Log in as | How | Drives |
 |---|---|---|
@@ -66,7 +68,7 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 - [ ] **Investor onboarding (S10):** `ops@` Sign Up (pick the pending invite; enter email/phone) → Identity → Submit KYC → **`compliance@`** Assess Suitability → **`ops@`** Financial Profile → **`compliance@`** Approve KYC → **`ops@`** MIA → Activate → **Active**.
 
 ### C. Deal lifecycle — the hero (invoice → cash → returns)
-- [ ] **Originate invoice (S14):** **Viewing as → Supplier** → **Upload Invoice** tab → pick a buyer, enter face value (paise), date, tenor, optionally attach a PDF → **Submit Invoice** → the invoice appears in the tracker (`draft`). *(Acting-as supplier under agency consent — an Ops action.)*
+- [ ] **Originate invoice (S14):** as `ops@`, open **S14 Supplier Portal** in the sidebar → **Upload Invoice** tab → pick a buyer, enter face value (paise), date, tenor, optionally attach a PDF → **Submit Invoice** → the invoice appears in the tracker (`draft`). *(Acting-as supplier under agency consent — an Ops action, so it's in the Ops sidebar.)*
 - [ ] **Go-live (S5):** the new invoice is in the **Invoice Checks** tab → record the checks → **Upload Invoice PDF** (if not attached in S14) → **login `ops2@`** record **Document Completeness** (DOC.3) → **`ops@`** finish checks → Send to Listing Approval → **login `treasury@`** Approve Go-Live → **Live**.
 - [ ] **Subscribe (S12):** open the live listing (via **S11**) → enter an amount → Commit → committed total rises.
 - [ ] **Disburse (S6):** **`treasury2@`** → open the drafted disbursement → Approve → **Disbursed**.
@@ -76,7 +78,7 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 ### E. Buyer self-service → **see §6**
 
 ### F. Read / audit
-- [ ] **S13 portfolio** (admin view): Viewing as → Investor → positions + summary + TDS. **S11 marketplace**: live listings.
+- [ ] **S13 portfolio + S11 marketplace**: log in as the **investor** (§5) → S11 lists live listings, S13 shows positions + summary + TDS. *(These are investor-role screens — reached by logging in as the investor, not a persona switch.)*
 - [ ] **S14 tracker**: the supplier's invoices + funding progress.
 - [ ] **S9 audit log** — **mock/deferred** (backend M17 not built); show as a placeholder, don't test live.
 
@@ -95,7 +97,7 @@ _Ops-on-behalf still works: an admin can also subscribe for an investor from S12
 ## 6. Buyer self-service (BE-15 — live)
 The buyer's ack-user logs in and acknowledges their own invoices.
 - [ ] **Prereq:** an invoice **awaiting acknowledgment**. In **S5**, on a listing that passed ops-checks, click **Send Ack Request** (leaves it pending for the buyer).
-- [ ] **Login:** go to **/s15** (or Viewing as → Buyer) → the portal's own login shows `ack@dev.local` prefilled → **Send OTP** (auto-fills) → **Verify** → the buyer portal opens.
+- [ ] **Login:** go to **/s15** (the buyer portal is a standalone screen) → its login shows `ack@dev.local` prefilled → **Send OTP** (auto-fills) → **Verify** → the buyer portal opens.
 - [ ] **Acknowledge (S15):** the pending invoice is listed → **Acknowledge** → Confirm → status → **acknowledged** (S5 now reflects it — the go-live can proceed).
 - [ ] **Scoping:** the buyer only sees their **own** invoices (a cross-account read → 403).
 

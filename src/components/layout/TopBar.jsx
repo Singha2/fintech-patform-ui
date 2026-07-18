@@ -23,16 +23,23 @@ export default function TopBar({ currentPersona, onPersonaChange, onMenuToggle }
         <span className="text-gray-300 text-sm">MVP</span>
       </div>
       <div className="flex items-center gap-3">
-        <span className="hidden sm:inline text-xs text-gray-500">Viewing as</span>
-        <select
-          value={currentPersona.id}
-          onChange={(e) => onPersonaChange(e.target.value)}
-          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-        >
-          {PERSONAS.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
-          ))}
-        </select>
+        {IS_LIVE
+          ? (/* live: identity is the logged-in session, not switchable — show the role, no persona dropdown */
+            <span className="rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5 text-sm font-medium text-gray-600">{currentPersona.name}</span>
+          ) : (
+            <>
+              <span className="hidden sm:inline text-xs text-gray-500">Viewing as</span>
+              <select
+                value={currentPersona.id}
+                onChange={(e) => onPersonaChange(e.target.value)}
+                className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              >
+                {PERSONAS.map((p) => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+            </>
+          )}
         {IS_LIVE && isAuthenticated && (
           <>
             {email && <span className="hidden md:inline text-xs text-gray-400" title="Logged-in account">{email}</span>}

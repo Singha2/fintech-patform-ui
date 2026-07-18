@@ -31,6 +31,29 @@ export const PERSONAS = [
 
 export const SIDEBAR_GROUPS = ['Admin', 'Auditor', 'Investor', 'Supplier', 'Buyer']
 
+// Live mode: the screens a session may reach, derived directly from the backend's roles[]/kind — no persona.
+// Inclusive by design (a screen a role partly acts on is shown; the backend enforces the real per-action authz,
+// so a step you lack the role for still 403s inline). Edit this table to change who sees what.
+const ROLE_SCREENS = {
+  super_admin:             ['S2', 'S3', 'S4', 'S5', 'S6', 'S7', 'S8', 'S10', 'S14'],
+  ops_executive:           ['S2', 'S3', 'S4', 'S5', 'S7', 'S10', 'S14'],
+  credit_reviewer:         ['S2', 'S3', 'S4'],
+  compliance_reviewer:     ['S2', 'S3', 'S8', 'S10'],
+  treasury_and_settlement: ['S2', 'S5', 'S6', 'S7'],
+  auditor:                 ['S9'],
+}
+
+// Screen ids a live session can reach — union of its roles' screens (+ kind for non-admins). The Sidebar reads
+// this in live mode instead of a persona's fixed accessibleScreens.
+export function screenIdsForSession(session) {
+  if (!session) return []
+  if (session.kind === 'investor') return ['S11', 'S12', 'S13']
+  if (session.kind === 'acknowledgment_user') return ['S15']
+  const set = new Set()
+  for (const r of session.roles ?? []) (ROLE_SCREENS[r] ?? []).forEach(s => set.add(s))
+  return [...set]
+}
+
 // Maps persona id → queue role keys in mockData.S2.queues
 export const PERSONA_ROLES = {
   'super-admin':         ['super_admin', 'ops_executive', 'credit_reviewer', 'compliance_reviewer', 'treasury_and_settlement'],

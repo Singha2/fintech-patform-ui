@@ -1,8 +1,12 @@
 import { NavLink } from 'react-router-dom'
-import { SCREENS, SIDEBAR_GROUPS } from '../../routes.js'
+import { SCREENS, SIDEBAR_GROUPS, screenIdsForSession } from '../../routes.js'
+import { useAuth } from '../../context/AuthContext.jsx'
+import { IS_LIVE } from '../../config.js'
 
 export default function Sidebar({ currentPersona, open, onClose }) {
-  const accessible = new Set(currentPersona.accessibleScreens)
+  const { session } = useAuth()
+  // Live: screens come straight from the session's roles/kind (no persona). Mock: the selected persona's set.
+  const accessible = new Set(IS_LIVE ? screenIdsForSession(session) : currentPersona.accessibleScreens)
 
   return (
     <>
