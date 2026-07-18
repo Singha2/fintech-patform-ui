@@ -26,7 +26,7 @@ to demo to the Founder. ~30 min. Dev **admins** log in with password **`DevPass1
 
 - **"Viewing as" dropdown** (top bar) = which **screens** you see.
 - **The account you logged in as** = what you're allowed to **do**. A **403** means wrong role.
-- **To switch account** (there's no logout button yet): open the login screen at **http://localhost:5173/s1** and log in as the needed account — the new login **replaces** the session.
+- **To switch account:** click **Log out** (top bar) → log in as the needed account. The logged-in email shows next to the button so you always know who you are.
 
 | Log in as | Role | Drives |
 |---|---|---|
@@ -81,7 +81,7 @@ Now S11 (marketplace), S6 (disbursement queue), S7 (distribution), S13 (portfoli
 ## 5. Founder demo (10 min, happy path)
 Two acts:
 1. **Platform runs a deal** (admin): login → **S2** dashboard → one **supplier onboarding (S3)** → **go-live (S5)** → **disburse (S6)** → **distribute (S7)**.
-2. **A real investor invests** (self-service): open **/s1** → **investor login** (email + OTP, §6) → **S11** browse → **S12** subscribe → **S13** portfolio — no Ops in the loop.
+2. **A real investor invests** (self-service): **Log out** → **investor login** (email + OTP, §6) → **S11** browse → **S12** subscribe → **S13** portfolio — no Ops in the loop.
 
 ---
 
@@ -96,7 +96,7 @@ _Ops-on-behalf still works: an admin can also subscribe for an investor from S12
 ---
 
 ## Tips
-- **403?** Wrong role — open **/s1** and log in as the account the step names (re-login replaces the session; there's no logout button yet).
+- **403?** Wrong role — click **Log out** (top bar) and log in as the account the step names.
 - **Screen empty?** Either run the seed in §3, or you haven't yet driven the journey that creates that data.
 - **OTP** auto-fills in dev; if it doesn't, `curl "localhost:8080/api/v1/dev/last-otp?email=<the-email>"`.
 - **Reset:** restarting the backend keeps data (idempotent). For a clean slate, ask the backend team to drop the dev DB.
