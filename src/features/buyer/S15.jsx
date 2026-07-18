@@ -86,7 +86,8 @@ export default function S15() {
     <div className="min-h-screen bg-gray-50">
       <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
         <span className="font-semibold text-gray-900 text-sm">{buyer.legal_name} · {buyer.ack_user.display_name}</span>
-        <Button variant="ghost" className="text-xs" onClick={() => { setVerified(false); setOtpSent(false); setOtp('') }}>Sign out</Button>
+        {/* Standalone mock portal (WS-2 not built) — logout resets the local OTP session; no server bearer to revoke yet. */}
+        <Button variant="ghost" className="text-xs" onClick={() => { setVerified(false); setOtpSent(false); setOtp('') }}>Log out</Button>
       </div>
 
       <div className="max-w-5xl mx-auto p-6">
