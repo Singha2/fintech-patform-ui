@@ -5,7 +5,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { IS_LIVE } from '../config.js'
 import { setBearer } from '../api/client.js'
-import { loginPassword, verifyOtp } from '../api/services/auth.js'
+import { loginPassword, verifyOtp, requestInvestorOtp, session as fetchSession } from '../api/services/auth.js'
 
 const AuthCtx = createContext(null)
 export function useAuth() { return useContext(AuthCtx) }
@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const persisted = loadPersisted()
   const [bearer, setBearerState] = useState(persisted?.bearer ?? null)
   const [email, setEmail] = useState(persisted?.email ?? '')
+  const [session, setSession] = useState(persisted?.session ?? null)  // { kind, investor_id, roles, … } from /auth/session
   const [loginStep, setLoginStep] = useState('credentials')  // 'credentials' | 'mfa'
   const [challengeId, setChallengeId] = useState(null)
 
@@ -27,10 +28,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     setBearer(bearer)
     if (!IS_LIVE) return
-    if (bearer) sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ bearer, email }))
+    if (bearer) sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ bearer, email, session }))
     else sessionStorage.removeItem(STORAGE_KEY)
-  }, [bearer, email])
+  }, [bearer, email, session])
 
+  // Admin login: email + password → OTP.
   async function beginLogin(inputEmail, password) {
     const { challenge_id } = await loginPassword(inputEmail, password)
     setEmail(inputEmail)
@@ -39,20 +41,34 @@ export function AuthProvider({ children }) {
     return challenge_id
   }
 
+  // Passwordless investor login (BE-18): email → OTP, no password.
+  async function beginInvestorLogin(inputEmail) {
+    const { challenge_id } = await requestInvestorOtp(inputEmail)
+    setEmail(inputEmail)
+    setChallengeId(challenge_id)
+    setLoginStep('mfa')
+    return challenge_id
+  }
+
   async function completeLogin(code) {
     const { bearer: token } = await verifyOtp(challengeId, code)
+    setBearer(token)                              // set on the client before reading /auth/session
     setBearerState(token)
     setLoginStep('credentials')
     setChallengeId(null)
-    return token
+    let s = null
+    try { s = await fetchSession() } catch { /* session read optional */ }
+    setSession(s)
+    return { token, session: s }
   }
 
   function logout() {
     setBearerState(null)
+    setSession(null)
     setChallengeId(null)
     setLoginStep('credentials')
   }
 
-  const value = { bearer, email, loginStep, challengeId, isAuthenticated: !!bearer, beginLogin, completeLogin, logout }
+  const value = { bearer, email, session, loginStep, challengeId, isAuthenticated: !!bearer, beginLogin, beginInvestorLogin, completeLogin, logout }
   return <AuthCtx.Provider value={value}>{children}</AuthCtx.Provider>
 }

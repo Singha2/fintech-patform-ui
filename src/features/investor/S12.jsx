@@ -12,6 +12,7 @@ import { describe } from '../../api/errors.js'
 import { IS_LIVE, IS_DEV_BACKEND } from '../../config.js'
 import { useStore } from '../../store/PlatformStore.jsx'
 import { useHydrate } from '../../store/useHydrate.js'
+import { useAuth } from '../../context/AuthContext.jsx'
 
 const VARIANTS = [
   { id: 'not_subscribed',          label: 'Not Subscribed' },
@@ -33,6 +34,7 @@ export default function S12() {
   const navigate = useNavigate()
   const location = useLocation()
   const { listingDetail } = useStore()
+  const { session } = useAuth()
 
   // Resolve the clicked listing from the shared store (closes G-C3); fall back to the seeded sample for the
   // demo listing and to fill fields a store-created listing may not carry (nested parties, VA, snapshot).
@@ -74,10 +76,10 @@ export default function S12() {
   const netReturn = grossReturn - tdsAmt
   const pct = fundingPct(committedTotal, fundingTarget)
 
-  // 🔗 POST /listings/{id}/subscriptions/commit {investor_id, amount_paise} — ops-on-behalf (OPS role; investor
-  // self-commit is BE-18). investor_id must be a REAL backend id: in live+dev we resolve the seeded active
-  // investor from /dev/seed-info; INVESTOR.id is the mock-mode placeholder. BE-18 (investor login) replaces this
-  // with the logged-in investor's own id.
+  // 🔗 POST /listings/{id}/subscriptions/commit — two callers (BE-18):
+  //  • investor self-commit — logged-in investor session → body {amount_paise}; backend derives the own investor_id.
+  //  • ops-on-behalf — admin session → body {investor_id, amount_paise}; investor_id resolved from /dev/seed-info
+  //    in live+dev (INVESTOR.id is the mock-mode placeholder).
   async function resolveInvestorId() {
     if (IS_LIVE && IS_DEV_BACKEND) return (await investorsSvc.devSeedInfo())?.investor_id ?? INVESTOR.id
     return INVESTOR.id
@@ -87,8 +89,10 @@ export default function S12() {
     if (committedTotal + amtNum * 100 > fundingTarget) { setAmountErr('Amount exceeds remaining headroom (G10/L.2).'); return }
     setAmountErr('')
     try {
-      const investor_id = await resolveInvestorId()
-      const env = await subscriptionsSvc.commit(listingId, { investor_id, amount_paise: amtNum * 100 })
+      const body = (IS_LIVE && session?.kind === 'investor')
+        ? { amount_paise: amtNum * 100 }                                            // self-commit (own id from session)
+        : { investor_id: await resolveInvestorId(), amount_paise: amtNum * 100 }     // ops-on-behalf
+      const env = await subscriptionsSvc.commit(listingId, body)
       await live.reload()
       setSubscription({ subscription_id: env?.aggregate_id ?? 'sub-new', amount: amtNum * 100, status: 'committed' })
       setVariant('committed')

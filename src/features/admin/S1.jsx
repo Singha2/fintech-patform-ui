@@ -38,18 +38,26 @@ export default function S1({ onLogin }) {
 
 // ── LIVE login: real password → OTP against the backend (DATA_MODE=live) ─────────────────────────────
 function LiveLogin({ onLogin }) {
-  const { beginLogin, completeLogin } = useAuth()
+  const { beginLogin, beginInvestorLogin, completeLogin } = useAuth()
+  const [mode, setMode]         = useState('admin')            // 'admin' (email+password) | 'investor' (passwordless)
   const [step, setStep]         = useState('credentials')
   const [email, setEmail]       = useState('ops@dev.local')     // dev default; any seeded admin works
   const [password, setPassword] = useState('DevPass123!')
   const [otp, setOtp]           = useState('')
   const [err, setErr]           = useState('')
   const [busy, setBusy]         = useState(false)
+  const isInvestor = mode === 'investor'
+
+  function switchMode(next) {
+    setMode(next); setErr(''); setOtp('')
+    setEmail(next === 'investor' ? 'investor@dev.local' : 'ops@dev.local')
+  }
 
   async function submitCredentials() {
     setErr(''); setBusy(true)
     try {
-      await beginLogin(email.trim(), password)
+      if (isInvestor) await beginInvestorLogin(email.trim())    // passwordless: email → OTP (BE-18)
+      else await beginLogin(email.trim(), password)
       setStep('mfa')
       if (IS_DEV_BACKEND) {                        // one-click dev login: auto-fill the OTP the stub "sent"
         try { const { code } = await devLastOtp(email.trim()); if (code) setOtp(code) } catch { /* ignore */ }
@@ -60,8 +68,10 @@ function LiveLogin({ onLogin }) {
   async function submitOtp() {
     setErr(''); setBusy(true)
     try {
-      await completeLogin(otp.trim())
-      const personaId = LIVE_LOGIN_PERSONA_MAP[email.trim().toLowerCase()] ?? 'ops-executive'
+      const { session } = await completeLogin(otp.trim())
+      const personaId = session?.kind === 'investor'
+        ? 'investor'
+        : (LIVE_LOGIN_PERSONA_MAP[email.trim().toLowerCase()] ?? 'ops-executive')
       onLogin(personaId)                           // advisory persona — backend enforces the real authz
     } catch (e) { setErr(describe(e)) } finally { setBusy(false) }
   }
@@ -71,10 +81,13 @@ function LiveLogin({ onLogin }) {
       {step === 'credentials' ? (
         <div className="flex flex-col gap-4">
           <FormField label="Email" id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} />
-          <FormField label="Password" id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
+          {!isInvestor && <FormField label="Password" id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} />}
           {err && <p className="text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{err}</p>}
-          <Button onClick={submitCredentials} disabled={busy || !email || !password}>{busy ? 'Signing in…' : 'Login'}</Button>
-          <p className="text-xs text-center text-gray-400">Live mode · seeded dev admins, password DevPass123!</p>
+          <Button onClick={submitCredentials} disabled={busy || !email || (!isInvestor && !password)}>{busy ? 'Signing in…' : isInvestor ? 'Send OTP' : 'Login'}</Button>
+          <button className="text-xs text-center text-indigo-600 hover:underline" onClick={() => switchMode(isInvestor ? 'admin' : 'investor')}>
+            {isInvestor ? '← Admin login (email + password)' : 'Investor? Log in with email + OTP →'}
+          </button>
+          <p className="text-xs text-center text-gray-400">{isInvestor ? 'Passwordless investor login (BE-18)' : 'Live mode · seeded dev admins, password DevPass123!'}</p>
         </div>
       ) : (
         <div className="flex flex-col gap-4">

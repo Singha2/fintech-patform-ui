@@ -268,3 +268,27 @@ until a richer read exists — flag, don't fake.
 Continue read-wiring the remaining screens above (mechanical — add a loader + `useHydrate`). Then a separate
 increment wires **write operations** to the service layer (envelope + re-read) so live mode persists. One work
 order at a time.
+
+---
+
+## BE-18 handoff — real investor login + self-commit (backend SHIPPED, DL-BE-088)
+
+> ✅ **UI IMPLEMENTED + E2E-verified** (`scripts/e2e/investor-self-commit.mjs`, 8/8): passwordless login →
+> `kind=investor` session → self-commit `{amount_paise}` lands in the investor's own portfolio; cross-tenant
+> `investor_id` → **403 `cross_tenant_read`**; enumeration-safe request-otp; ops-on-behalf unchanged (no regression).
+> Wired: `auth.requestInvestorOtp` + `AuthContext.beginInvestorLogin`/`session`; S1 investor login toggle (email→OTP);
+> App routes an investor login to **S11**; S12 self-commit vs ops-on-behalf by session kind; S13 already own-scoped.
+
+The backend now supports a genuine self-service investor (no dev password, no ops-on-behalf). Three interim shims can retire — all already isolated:
+
+- **Investor login** — add a passwordless path in `AuthContext`: `POST /auth/login/investor/request-otp {email}` → `{challenge_id}` → `POST /auth/login/verify-otp {challenge_id, code}` → bearer. Skip the password step for the investor entry (today investors use the dev password `login('investor@…')`). The endpoint is **enumeration-safe** (an unknown/ineligible email returns the same `{challenge_id}` shape and sends nothing) — so the UI cannot tell "not a valid investor" from "wrong code"; surface a single generic "check your code" on verify failure. Only an **active** (KYC-approved) investor can actually log in.
+
+- **S12 subscribe** — drop `resolveInvestorId()` (the `/dev/seed-info` lookup) and the ops-on-behalf `investor_id` from the body. Under an investor session, POST `/listings/{id}/subscriptions/commit` with **`{amount_paise}` only** — the backend derives `investor_id` from the session. A body `investor_id` for a different investor → **403 `cross_tenant_read`**. The `INVESTOR.id` placeholder retires. (Ops-on-behalf still works for admin sessions — no rush to migrate both.)
+
+- **S13 portfolio** — already scopes to `GET /auth/session`'s own `investor_id`; it just stops needing the `/dev/seed-info` admin fallback once a real investor session exists. No structural change.
+
+- **S10 onboarding** — unchanged (stays ops-assisted).
+
+Suggested E2E harness `scripts/e2e/investor-self-commit.mjs` (mirror `investor-onboarding.mjs`): passwordless login → self-commit on a `/dev/seed-listing {stage:"live"}` listing → assert own subscription persists + a cross-tenant `investor_id` is rejected. Reads: `API_CATALOGUE.md` (new `/auth/login/investor/request-otp` row + updated commit role-line), backend `docs/modules/M11-B-investor-login-selfcommit.md`.
+
+_Note: `request-otp` has no dedicated rate-limiter yet (deferred to platform-wide auth-hardening) — fine for pilot, flagged before public scale._

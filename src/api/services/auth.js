@@ -9,6 +9,13 @@ export async function loginPassword(email, password) {
   return data                                   // { challenge_id }
 }
 
+// Passwordless investor login (BE-18): email → OTP for an active investor → challenge_id, then verifyOtp.
+// Enumeration-safe: the backend returns a challenge_id-shaped 200 whether or not the email is an eligible investor.
+export async function requestInvestorOtp(email) {
+  const { data } = await request('POST', '/auth/login/investor/request-otp', { body: { email } })
+  return data                                   // { challenge_id }
+}
+
 export async function verifyOtp(challengeId, code) {
   const { data } = await request('POST', '/auth/login/verify-otp', { body: { challenge_id: challengeId, code } })
   return data                                   // { bearer }

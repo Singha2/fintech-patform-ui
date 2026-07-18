@@ -41,7 +41,10 @@ function AppRoutes() {
       ? personaId
       : (LOGIN_PERSONA_MAP[personaId] ?? 'ops-executive')
     setPersonaById(routesPersonaId)
-    navigate(routesPersonaId === 'auditor' ? '/s9' : '/s2')
+    const landing = routesPersonaId === 'auditor' ? '/s9'
+      : routesPersonaId === 'investor' ? '/s11'   // investors land on the marketplace, not onboarding
+      : '/s2'
+    navigate(landing)
   }
 
   return (
