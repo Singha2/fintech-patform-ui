@@ -23,10 +23,9 @@ subscribe).
    ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
    ```
 2. **Seed accounts present** — the seven `*@dev.local` admins (password `DevPass123!`), incl.
-   `ops2@dev.local` (DOC.3 second ops) and `treasury2@dev.local` (disbursement checker).
-   ⚠️ `DevDataSeeder` only seeds when `admin_user` is empty, so on a **pre-existing** dev DB a newly
-   added seed account (e.g. `ops2@`) will be missing until the DB is re-seeded. `s5golive.mjs` needs
-   `ops2@`; if its login 401s, re-seed the dev DB (or provision the account) first.
+   `ops2@dev.local` (DOC.3 second ops) and `treasury2@dev.local` (disbursement checker). As of **DL-BE-087**
+   the seeder *ensures* each admin per-email on every dev boot, so all seven land even on a pre-existing DB —
+   no wipe needed. (If `ops2@` ever 401s, you're on a backend build older than DL-BE-087; rebuild/restart.)
 
 ## Run
 ```

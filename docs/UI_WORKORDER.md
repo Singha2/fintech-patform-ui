@@ -249,11 +249,12 @@ are from those test cases, none from real flows).
 S5 go-live, S6 approve, S7 maturity/distribution, S12 subscribe. No-endpoint writes (revokeInvite, buyer self-ack)
 stay mock.
 
-⚠️ **Backend/env caveat (ops2 materialization).** `DevDataSeeder` is empty-guarded (seeds only when `admin_user`
-is empty), so DL-BE-086's new `ops2@dev.local` does **not** appear on any pre-existing dev DB — the running dev DB
-had 6 admins and the seeder skipped. Verifying S5 go-live required inserting `ops2` manually (mirroring
-`seedAdmin`, cloning `ops@`'s Argon2id hash). **Backend follow-up:** make the seeder upsert missing admin accounts
-(or add a `/dev/ensure-admins` helper) so a full DB wipe isn't needed to pick up new seed accounts.
+✅ **ops2 materialization — resolved (DL-BE-087 / DF-3).** `DevDataSeeder` now *ensures* each of the seven dev
+admins per-email on every dev boot (and guards the counterparty seed on `sup_account` emptiness), so
+`ops2@dev.local` — and any seed admin added later — lands on a pre-existing dev DB with no wipe. Verified: after
+the DL-BE-087 rebuild the seeder logs "ensuring dev admins → … already present — skipping" for all seven (adopting
+the earlier manual `ops2` insert, no duplicate), `ops2@` login 200, e2e suites green (16/16 + 22/22).
+*(Historical: initial S5 go-live verification pre-DF-3 required a manual `ops2` insert — no longer needed.)*
 
 **Write-wiring is complete and E2E-verified** — every write button that has a backend command calls it directly
 (no fallback), with version threading + inline errors. Remaining front-end feature: the S5 invoice-document upload UI.
